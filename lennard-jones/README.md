@@ -1,4 +1,4 @@
-# Learning To Grow: Lennard-Jones Potential
+# Learning to grow: Lennard-jones potential
 
 ## Modules on Cori GPU
 
