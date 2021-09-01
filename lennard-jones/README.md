@@ -35,4 +35,6 @@ python3.8 scripts/run_l2g.py -gpus 8
 conda deactivate
 ```
 
+## Reference
 
+S. Whitelam, I. Tamblyn. "Learning to grow: control of materials self-assembly using evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604 
