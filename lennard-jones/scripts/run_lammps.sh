@@ -1,6 +1,9 @@
 #!/bin/bash
 
-ROOT_PATH="/global/homes/a/asdufek/projects/digital-twin/learningTogrow/lennard-jones"
+HOME="$(pwd)"
+OUTPUT_DIR="$HOME/output"
+
+mkdir -p "$OUTPUT_DIR"
 
 npop=$1
 ngpus=$2
@@ -13,9 +16,9 @@ while [ $p -lt $npop ]; do
       if [ $p -lt $npop ]; then
 	 #echo "Running pop "$p "gpu "$g
 	 if [ $opt -eq 1 ]; then
-            ./lmp -pk gpu $ngpus gpuID $g -sf gpu -in $ROOT_PATH/input/in.lennard-jones-best > $ROOT_PATH/output/out.lennard-jones-best &
+            $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.lennard-jones-best > $OUTPUT_DIR/out.lennard-jones-best &
          elif [ $opt -eq 0 ]; then
-            ./lmp -pk gpu $ngpus gpuID $g -sf gpu -in $ROOT_PATH/input/in.lennard-jones-$p > $ROOT_PATH/output/out.lennard-jones-$p &
+            $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.lennard-jones-$p > $OUTPUT_DIR/out.lennard-jones-$p &
          fi
       fi
       p=$(( $p + 1 ))
