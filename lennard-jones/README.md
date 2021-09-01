@@ -12,7 +12,7 @@ module load python/3.8-anaconda-2020.11
 
 ## Environment variable
 
-Define the `LAMMPS_DIR` environment variable in `scripts/submit.sh` according to the directory where your 'lmp' executable is located.
+Define the `LAMMPS_DIR` environment variable in `scripts/submit.sh` according to the directory where your `lmp` executable is located.
 
 ## Run on Cori GPU
 
