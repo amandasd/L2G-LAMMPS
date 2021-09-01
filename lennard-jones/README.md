@@ -27,11 +27,10 @@ module load python/3.8-anaconda-2020.11
 export LAMMPS_DIR=<lmp executable directory>
 export OMP_NUM_THREADS=1
 
-salloc -C gpu -N 1 -G 8 -t 20 -A m1759 --exclusive -q special
+salloc -C gpu -N <number of nodes> -G <number of gpus> -t <time> -A <account> --exclusive -q special
 
 source activate myenv-3.8
 python3.8 scripts/run_l2g.py -gpus <number of gpus>
-python3.8 scripts/run_l2g.py -gpus 8
 conda deactivate
 ```
 
