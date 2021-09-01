@@ -7,10 +7,10 @@ Solution is an array of real values that represent a neural network
 
 ## Environment variable
 
-Define the `LAMMPS_DIR` environment variable in `scripts/submit.sh` according to the directory where your `lmp` executable is located.
 
 ## Run on Cori GPU
 
+Define the `LAMMPS_DIR` environment variable in `scripts/submit.sh` according to the directory where your `lmp` executable is located\
 ```
 sbatch ./scripts/submit.sh
 ```
