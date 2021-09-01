@@ -5,9 +5,6 @@ Fixed values of epsilon and sigma parameters\
 Varied values of temperature and pressure\
 Solution is an array of real values that represent a neural network
 
-## Environment variable
-
-
 ## Run on Cori GPU
 
 Define the `LAMMPS_DIR` environment variable in `scripts/submit.sh` according to the directory where your `lmp` executable is located.
