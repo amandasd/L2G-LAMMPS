@@ -1,7 +1,7 @@
 # Learning to grow: Lennard-jones potential
 
-Objective: maximize Q6 bond-order parameter\
-Fixed values of epsilon and sigma\
+The objective is to maximize Q6 bond-order parameter\
+Fixed values of epsilon and sigma parameters\
 Varied values of temperature and pressure\
 Solution is an array of real values that represent a neural network
 
