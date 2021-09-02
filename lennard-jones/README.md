@@ -1,4 +1,4 @@
-# Learning to grow: Lennard-jones potential
+# Learning to grow for LAMMPS: Lennard-jones potential
 
 The objective is to maximize Q6 bond-order parameter\
 Fixed values of epsilon and sigma parameters\
