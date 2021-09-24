@@ -1,0 +1,4 @@
+LAMMPS (8 Apr 2021)
+  using 1 OpenMP thread(s) per MPI task
+Reading restart file ...
+ERROR on proc 0: Cannot open restart file output/lj.restart-12.16000: No such file or directory (src/read_restart.cpp:112)
