@@ -207,8 +207,23 @@ def run_networks(pop, temp, press, node_input, n):
 # evaluate all candidates in the population
 def evaluate(pop, gen, n):
 
-    temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
-    press = np.random.uniform(bounds[1][0], bounds[1][1], n)
+    #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation?
+    if gen < 0:
+        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
+        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
+    else:
+        for p in range(n):
+            temp[p] += random.gauss(0,0.01)
+            if temp[p] > bounds[0][1]:
+                temp[p] = bounds[0][1]
+            if temp[p] < bounds[0][0]:
+                temp[p] = bounds[0][0]
+            press[p] += random.gauss(0,0.01)
+            if press[p] > bounds[1][1]:
+                press[p] = bounds[1][1]
+            if press[p] < bounds[1][0]:
+                press[p] = bounds[1][0]
+
     # run LAMMPS
     if gen < n_iter:
         run_lammps(temp, press, 0, gen) 
