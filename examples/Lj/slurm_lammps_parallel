@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH -A m3793
+#SBATCH -N 1
+#SBATCH -C knl
+#SBATCH -q debug
+#SBATCH -J l2g_lammps
+#SBATCH -t 00:05:00
+
+
+HOME="$(pwd)"
+OUTPUT_DIR="$HOME/output"
+mkdir -p "$OUTPUT_DIR"
+
+
+module load lammps
+
+
+export OMP_NUM_THREADS=1
+export OMP_PLACES=threads
+export OMP_PROC_BIND=spread
+
+
+srun -N 1 -n 64 -c 1 --cpu-bind=cores lmp_cori  -in $HOME/input/in.lennard-jones-best> $OUTPUT_DIR/out.lennard-jones-best &
+
+wait
+touch flag

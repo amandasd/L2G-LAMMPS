@@ -1,0 +1,3 @@
+# Time-averaged data for fix tavqlwlhat
+# TimeStep c_avql[2]
+20000 0.290214
