@@ -1,0 +1,48 @@
+dimension      3
+box            tilt large
+units          metal
+atom_style     atomic
+neighbor       1.0 bin
+atom_modify    map array sort 0 0
+boundary       p p p
+
+read_data      /global/project/projectdirs/m3793/Suvo/learningTogrow/My_Mod/C/in.data
+    
+#----------Pair Style-------------
+
+pair_style     lcbop
+pair_coeff     * * /global/project/projectdirs/m3793/Suvo/learningTogrow/My_Mod/C/C.lcbop C
+
+
+#----------variables (define T,P here)--------
+
+variable       potential equal pe/atoms
+variable       P equal 1000.0
+variable       T equal 1000
+
+neigh_modify   one 5000
+
+#----------Thermo--------------
+
+thermo         1000
+thermo_style   custom step etotal atoms vol press
+thermo_modify  format float %5.14g
+
+
+#------------For NVE Run (equilibriation)------------
+
+velocity      all create ${T} 4928459 rot yes dist gaussian
+fix           1 all nve
+timestep      0.001  #1fs
+run           1000 #1ps
+
+#---------------NPT production run----------------
+
+unfix         1
+fix           2 all npt temp ${T} ${T} 1.0 iso ${P} ${P} 10.0
+dump          1 all custom 1000 dump.out id type x y z
+#restart       6000 output/data.restart
+run           5000 #5ps
+write_data    out.data
+
+#-----------------------------------------------

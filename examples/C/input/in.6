@@ -1,0 +1,40 @@
+read_restart    output/lj.restart-6.16000
+
+neighbor       1.0 bin
+
+#----------Pair Style-------------
+
+pair_style     lcbop
+pair_coeff     * * /global/project/projectdirs/m3793/Suvo/learningTogrow/My_Mod/C/C.lcbop C
+
+
+#----------variables (define T,P here)--------
+
+variable       potential equal pe/atoms
+variable       P equal 1616.341632445967
+variable       T equal 10000
+
+neigh_modify   one 5000
+
+#----------Thermo--------------
+
+thermo         1000
+thermo_style   custom step etotal atoms vol
+thermo_modify  format float %5.14g
+
+
+#---------------NPT production run-------------
+
+velocity      all create ${T} 4928459 rot yes dist gaussian
+fix           1 all npt temp ${T} ${T} 1.0 iso ${P} ${P} 10.0
+dump          1 all custom 1000 dump-6.out id type x y z
+restart      6000 output/data.restart-6
+
+timestep      0.001 #1fs
+run           5000 #5ps
+
+write_data    out-6.data
+
+#-----------------------------------------------
+
+
