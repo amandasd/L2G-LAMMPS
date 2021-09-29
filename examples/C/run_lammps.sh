@@ -16,8 +16,8 @@ opt=$2
 #-----Create a submission script based on the opt values-----
 
 
-source ~/anaconda3/bin/activate
-
+#source ~/anaconda3/bin/activate
+source /global/cfs/cdirs/m1917/blast_ff/activate_py
 
 python JobCreator.py $npop $opt
 

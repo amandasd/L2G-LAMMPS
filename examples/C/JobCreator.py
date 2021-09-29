@@ -22,9 +22,9 @@ opt = int(sys.argv[2])
 def job_script(outfile,npop,opt):
     
     
-    with open(outfile,"a") as outfile:
+    with open(outfile,"w") as outfile:
         outfile.write("#!/bin/bash\n")
-        outfile.write("#SBATCH -A m3793\n")
+        outfile.write("#SBATCH -A m3838\n")
         outfile.write("#SBATCH -N {}\n".format(npop))
         outfile.write("#SBATCH -C knl\n")
         outfile.write("#SBATCH -q debug\n")

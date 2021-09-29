@@ -43,9 +43,9 @@ def Get_SOAP(structure):
     '''
     ASEobject = StructureToAse(structure)
     species = list(set(get_species(structure)))
-    rcut = 3
-    nmax = 3
-    lmax = 3
+    rcut = 6
+    nmax = 6
+    lmax = 4
     #rbf = 'polynomial'
     periodic_soap = SOAP(
         species=species,

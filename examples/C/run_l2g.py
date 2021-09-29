@@ -12,6 +12,7 @@ import argparse
 from  getSoap import  Get_SOAP
 from pymatgen.io.lammps.data import LammpsData
 from pymatgen import Structure,Lattice
+from sklearn.metrics.pairwise import cosine_similarity
 
 #################################################################################
 # Learning To Grow: Lennard-Jones potential
@@ -25,15 +26,15 @@ from pymatgen import Structure,Lattice
 #################################################################################
 
 # define LAMMPS parameters
-bounds = [[1000, 2000],  [10000, 15000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
+bounds = [[100, 2000],  [1, 250000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
 nve_steps = 1000
 npt_steps = 5000
-n_steps = 3 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+n_steps = 20 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
 
 # define evolutionary algorithm parameters
-n_iter = 3 # define the total iterations
+n_iter = 20 # define the total iterations
 n_pop = 16 # define the population size
-r_mut = 0.9 # mutation rate
+r_mut = 0.5 # mutation rate
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
 
 # define neural network parameters 
@@ -49,13 +50,14 @@ output_layer = 2
 # functions
 #################################################################################
 
-def SOAP(filename):
+def scoring(filename):
     struct = LammpsData.from_file(filename,atom_style="atomic").structure
-    refStruct = LammpsData.from_file("in.Cubic",atom_style="atomic").structure
+    refStruct = LammpsData.from_file("in.targetStructure",atom_style="atomic").structure
     soap = Get_SOAP(struct)
     ref_soap = Get_SOAP(refStruct)
 
-    return np.linalg.norm(np.array(soap)-np.array(ref_soap))  #eucledian norm
+    #return np.linalg.norm(np.array(soap)-np.array(ref_soap))  #eucledian norm
+    return cosine_similarity(soap, ref_soap)
 
 
 
@@ -66,7 +68,7 @@ def selection(pop, scores, k=3):
     for ix in randint(0, len(pop), k-1):
         # check if better (e.g. perform a tournament)
         if scores[ix] > scores[selection_ix]:
-    	    selection_ix = ix
+            selection_ix = ix
     return pop[selection_ix]
 
 # mutation operator
@@ -94,15 +96,17 @@ def run_lammps(temp, press, state, gen):
 
     # generate the LAMMPS input files for each candidate in the population
     for p in range(n_pop):
-        # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
+        # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits
+        print('Gen: ', gen, '    Sample: ', p, '    State: ', state, '    Temp: ', temp[p], '    Press: ', press[p], flush=True)
         newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(press[p]))
-        newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(temp[p]))
+        newdata = newdata.replace("variable       T equal 1000.0","variable       T equal {}".format(temp[p]))
         newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps+npt_steps)+" output/data.restart-"+str(p))
         newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom 1000 dump-{}.out id type x y z".format(p)) 
         newdata = newdata.replace("write_data    out.data","write_data    out-{}.data".format(p))
     
         if state > 0:
-            newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/lj.restart-"+str(p)+"."+str(state))
+            newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/data.restart-"+str(p)+"."+str(state))
+            newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-"+str(p))
     
         fileout = "input/in."+str(p)
         f = open(fileout,'w')
@@ -142,15 +146,16 @@ def best_lammps(temp, press, state, gen):
 
     # generate the LAMMPS input files for the best candidate in the population
     # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
-    newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(press[p]))
-    newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(temp[p]))
+    newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(press[0]))
+    newdata = newdata.replace("variable       T equal 1000.0","variable       T equal {}".format(temp[0]))
     newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps+npt_steps)+" output/data.restart-best")
-    newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom 1000 dump-{}.out id type x y z".format(p))
-    newdata = newdata.replace("write_data    out.data","write_data    out-{}.data".format(p))
+    newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom 1000 dump-best-{}.out id type x y z".format(str(state)))
+    newdata = newdata.replace("write_data    out.data","write_data    out-best-{}.data".format(str(state)))
     
     
     if state > 0:
-         newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/lj.restart-best."+str(state))
+        newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/data.restart-best."+str(state))
+        newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-best")
     fileout = "input/in.best"
     f = open(fileout,'w')
     f.write(newdata)
@@ -217,8 +222,10 @@ def evaluate(pop, gen, n):
     press = np.random.uniform(bounds[1][0], bounds[1][1], n)
     # run LAMMPS
     if gen < n_iter:
+        print("Running for Gen %s, Using initial structure set-up" %str(gen))
         run_lammps(temp, press, 0, gen) 
     else:
+        print("Running for Best candidate, Using initial structure set-up")
         best_lammps(temp, press, 0, n_iter)
 
     for s in range(n_steps):
@@ -228,8 +235,10 @@ def evaluate(pop, gen, n):
         state = s*npt_steps+npt_steps+nve_steps
         # run LAMMPS
         if gen < n_iter:
+            print("Running for Gen %s, Nstep %s" %(str(gen), str(s)))
             run_lammps(temp, press, state, gen) 
         else:
+            print("Running for Best candidate, Nstep %s" %(str(s)))
             best_lammps(temp, press, state, n_iter)
 
     for p in range(n):
@@ -237,31 +246,36 @@ def evaluate(pop, gen, n):
         if state > 0 and state > (nve_steps+npt_steps):
             for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
                 if gen < n_iter:
-                    os.system('rm output/lj.restart-'+str(p)+"."+str(i))
+                    os.system('rm output/data.restart-'+str(p)+"."+str(i))
                 else:
-                    os.system('rm output/lj.restart-best.'+str(i))
+                    os.system('rm output/data.restart-best.'+str(i))
+                        
         elif state > 0:
             if gen < n_iter:
-                os.system('rm output/lj.restart-'+str(p)+"."+str(state))
+                os.system('rm output/data.restart-'+str(p)+"."+str(state))
             else:
-                os.system('rm output/lj.restart-best.'+str(state))
+                os.system('rm output/data.restart-best.'+str(state))
 
     scores = []
     for p in range(n):
         if gen < n_iter:
             filein = "output/out-"+str(p)+".data"
         else:
+            os.system('cp output/out-best-'+str(state - npt_steps)+'.data output/out-best.data')
             filein = "output/out-best.data"
         
         #--------------Getting Fp difference----------------
         
-        fp_Diff = SOAP(filein)
+        fp_Diff = scoring(filein)
 
         #------------------------------------
 
-        scores.append(1/fp_Diff) 
-
-    os.system('mv  output gen_{}'.format(gen))
+        scores.append(fp_Diff) 
+        
+    if gen < n_iter:
+        os.system('mv  output gen_{}'.format(gen))
+    else:
+        os.system('mv  output best_output')
     return scores
 
 
@@ -270,91 +284,91 @@ def evaluate(pop, gen, n):
 # end of functions
 #################################################################################
 
+
 #################################################################################
 # learning to grow: main code
 #################################################################################
-
-
-
-print()
-print("population size: "+str(n_pop))
-print("number of retained solutions: "+str(n_best)) 
-print("number of iterations: "+str(n_iter))
-print()
-
-random.seed(datetime.now())
-
-#-------------Restarting section-----------------
-restart = False
-
-if restart:
-    data = open("restart.dat","r").readlines()[-1]
-    pop = eval(data.split("|")[0])
-    sores = eval(data.split("|")[1])
-
-else:
-    # generate a random initial population: weights and bias of neural networks
-    pop = [[random.gauss(0,1) for _ in range(hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer)] for _ in range(n_pop)]
-    # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, -1, n_pop)
-
-
-#----------------------------------------------
-
-# select the best candidate 
-idx = scores.index(max(scores))
-best, best_eval = idx, scores[idx]
-print(">-1, new best = %f" % (best_eval))
-print()
-
-
-with open("dumpfile.dat","a") as outfile:
-    outfile.write("{} {} {}\n".format(-1,idx,best_eval))    #generation pop_id, best_score
-
-
-
-for gen in range(n_iter): # maximum number of iterations
-
-    # rank the scores 
-    indices = [scores.index(x) for x in sorted(scores, reverse=True)]
-
-    # select parents from the current population
-    # n_best candidates are selected to generate new candidates
-    selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
+if __name__ == '__main__':
     
-    # create the next generation
-    children = list()
-    for i in range(0, n_pop):
-        c = selected[i]
-        # mutation: change weights and bias of neural networks
-        mutation(c, 0, 0.01, r_mut)
-        # store for next generation
-        children.append(c)
-    # replace population
-    pop = children
+    print()
+    print("population size: "+str(n_pop))
+    print("number of retained solutions: "+str(n_best)) 
+    print("number of iterations: "+str(n_iter))
+    print()
 
-    # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, gen, n_pop)
+    random.seed(datetime.now())
 
-    # select the best candidate
+    #-------------Restarting section-----------------
+    restart = False
+
+    if restart:
+        data = open("restart.dat","r").readlines()[-1]
+        pop = eval(data.split("|")[0])
+        scores = eval(data.split("|")[1])
+
+    else:
+        # generate a random initial population: weights and bias of neural networks
+        pop = [[random.gauss(0,1) for _ in range(hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer)] for _ in range(n_pop)]
+        # evaluate all candidates in the population: run neural networks and LAMMPS
+        scores = evaluate(pop, -1, n_pop)
+
+
+    #----------------------------------------------
+
+    # select the best candidate 
     idx = scores.index(max(scores))
-    if scores[idx] > best_eval:
-        best, best_eval = pop[idx], scores[idx]
-        print(">%d, new best = %f" % (gen, best_eval))
-        print()
-    
+    best, best_eval = idx, scores[idx]
+    print(">-1, new best = %f" % (best_eval))
+    print()
+
+
     with open("dumpfile.dat","a") as outfile:
-        outfile.write("{} {} {}\n".format(gen,idx,best_eval))
+        outfile.write("{} {} {}\n".format(-1,idx,best_eval))    #generation pop_id, best_score
 
-    with open("restart.dat","a") as outfile2:
-        outfile2.write("{} | {}\n".format(pop,scores))
 
-# evaluate the best candidate
-scores = evaluate([pop[idx]], n_iter, 1)
-print("best = %f" % (scores[0]))
 
-with open("dumpfile.dat","a") as outfile:
-    outfile.write("{} {} {}\n".format(n_iter,idx,best_eval))
+    for gen in range(n_iter): # maximum number of iterations
+
+        # rank the scores 
+        indices = [scores.index(x) for x in sorted(scores, reverse=True)]
+
+        # select parents from the current population
+        # n_best candidates are selected to generate new candidates
+        selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
+
+        # create the next generation
+        children = list()
+        for i in range(0, n_pop):
+            c = selected[i]
+            # mutation: change weights and bias of neural networks
+            mutation(c, 0, 0.01, r_mut)
+            # store for next generation
+            children.append(c)
+        # replace population
+        pop = children
+
+        # evaluate all candidates in the population: run neural networks and LAMMPS
+        scores = evaluate(pop, gen, n_pop)
+
+        # select the best candidate
+        idx = scores.index(max(scores))
+        if scores[idx] > best_eval:
+            best, best_eval = pop[idx], scores[idx]
+            print(">%d, new best = %f" % (gen, best_eval))
+            print()
+
+        with open("dumpfile.dat","a") as outfile:
+            outfile.write("{} {} {}\n".format(gen,idx,best_eval))
+
+        with open("restart.dat","a") as outfile2:
+            outfile2.write("{} | {}\n".format(pop,scores))
+
+    # evaluate the best candidate
+    scores = evaluate([pop[idx]], n_iter, 1)
+    print("best = %f" % (scores[0]))
+
+    with open("dumpfile.dat","a") as outfile:
+        outfile.write("{} {} {}\n".format(n_iter,idx,best_eval))
 
 
 #################################################################################

@@ -8,3 +8,17 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+
+
+examples/C/slurm-*.out
+examples/C/gen_*
+examples/C/.ipynb_checkpoints/
+examples/C/flag
+examples/C/*.dat
+examples/C/input/*.[0-9]*
+examples/C/output
+examples/C/slurm_lammps_parallel
+examples/C/log
+examples/C/log.lammps
+examples/C/input/.ipynb_checkpoints/
+examples/C/input/in.best
