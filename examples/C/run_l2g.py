@@ -375,7 +375,7 @@ if __name__ == '__main__':
 
     # evaluate the best candidate
     #scores = evaluate([pop[idx]], n_iter, 1)
-    scores = evaluate(best, n_iter, 1)
+    scores = evaluate([best], n_iter, 1)
     print("best = %f" % (scores[0]))
 
     with open("dumpfile.dat","a") as outfile:
