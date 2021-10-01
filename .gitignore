@@ -22,3 +22,7 @@ examples/C/log
 examples/C/log.lammps
 examples/C/input/.ipynb_checkpoints/
 examples/C/input/in.best
+examples/C/best_output
+examples/C/log*
+examples/C/dump-*.out
+examples/C/out-*.data

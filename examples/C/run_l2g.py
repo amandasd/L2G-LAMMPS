@@ -14,6 +14,9 @@ from pymatgen.io.lammps.data import LammpsData
 from pymatgen import Structure,Lattice
 from sklearn.metrics.pairwise import cosine_similarity
 
+import pickle
+from carbon_phase_fp_data import carbon_fp
+
 #################################################################################
 # Learning To Grow: Lennard-Jones potential
 # Objective: maximize Q6 bond-order parameter
@@ -26,7 +29,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 #################################################################################
 
 # define LAMMPS parameters
-bounds = [[100, 2000],  [1, 250000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
+bounds = [[100, 5000],  [1, 250000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
 nve_steps = 1000
 npt_steps = 5000
 n_steps = 20 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
@@ -50,14 +53,17 @@ output_layer = 2
 # functions
 #################################################################################
 
-def scoring(filename):
-    struct = LammpsData.from_file(filename,atom_style="atomic").structure
-    refStruct = LammpsData.from_file("in.targetStructure",atom_style="atomic").structure
-    soap = Get_SOAP(struct)
-    ref_soap = Get_SOAP(refStruct)
+def scoring(cfp, filename, ref_phase='diamond'):
+    #struct = LammpsData.from_file(filename,atom_style="atomic").structure
+    #refStruct = LammpsData.from_file("in.targetStructure",atom_style="atomic").structure
+    #soap = Get_SOAP(struct)
+    #ref_soap = Get_SOAP(refStruct)
 
     #return np.linalg.norm(np.array(soap)-np.array(ref_soap))  #eucledian norm
-    return cosine_similarity(soap, ref_soap)
+    #return cosine_similarity(soap, ref_soap)
+    Ds_euclidean, Ds_cos = cfp.new_phase_distance(filename)
+    dist = Ds_euclidean[ref_phase].values[0] + Ds_cos[ref_phase].values[0]*10  # Distance to TARGET phase
+    return -1*dist  # The GA code maximize score; so multiply distance by -1
 
 
 
@@ -200,13 +206,13 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_layer):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_layer)
 
-        temp[p] += node_output[0]
+        temp[p] += node_output[0]*100
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
         if temp[p] < bounds[0][0]:
             temp[p] = bounds[0][0]
         
-        press[p] += node_output[1]
+        press[p] += node_output[1]*10000
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
         if press[p] < bounds[1][0]:
@@ -266,7 +272,7 @@ def evaluate(pop, gen, n):
         
         #--------------Getting Fp difference----------------
         
-        fp_Diff = scoring(filein)
+        fp_Diff = scoring(cfp, filein)
 
         #------------------------------------
 
@@ -298,6 +304,10 @@ if __name__ == '__main__':
 
     random.seed(datetime.now())
 
+    #-------------Reading Impt Carbon fingeprint data-----------------    
+    with open("C_imp_phase_fp.pkl", "rb") as f:
+        cfp = pickle.load(f)    
+
     #-------------Restarting section-----------------
     restart = False
 
@@ -315,7 +325,7 @@ if __name__ == '__main__':
 
     #----------------------------------------------
 
-    # select the best candidate 
+    # select the best candidate
     idx = scores.index(max(scores))
     best, best_eval = idx, scores[idx]
     print(">-1, new best = %f" % (best_eval))
@@ -361,10 +371,11 @@ if __name__ == '__main__':
             outfile.write("{} {} {}\n".format(gen,idx,best_eval))
 
         with open("restart.dat","a") as outfile2:
-            outfile2.write("{} | {}\n".format(pop,scores))
+            outfile2.write("{} | {}\n".format([p.tolist() for p in pop],scores))
 
     # evaluate the best candidate
-    scores = evaluate([pop[idx]], n_iter, 1)
+    #scores = evaluate([pop[idx]], n_iter, 1)
+    scores = evaluate(best, n_iter, 1)
     print("best = %f" % (scores[0]))
 
     with open("dumpfile.dat","a") as outfile:
