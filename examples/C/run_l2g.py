@@ -3,6 +3,7 @@
 from numpy.random import randint
 from numpy.random import rand
 import random
+import pandas as pd
 
 from datetime import datetime 
 
@@ -31,8 +32,9 @@ from carbon_phase_fp_data import carbon_fp
 # define LAMMPS parameters
 bounds = [[100, 5000],  [1, 250000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
 nve_steps = 1000
-npt_steps = 5000
-n_steps = 20 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+npt_steps = 2000
+n_steps = 5 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+dump_freq = 500
 
 # define evolutionary algorithm parameters
 n_iter = 20 # define the total iterations
@@ -66,6 +68,25 @@ def scoring(cfp, filename, ref_phase='diamond'):
     return -1*dist  # The GA code maximize score; so multiply distance by -1
 
 
+def scoring_temp(lammps_file, target=3000):
+    thermo_data = []
+    with open(lammps_file) as infile:
+        copy = False
+        for line in infile:
+            line = line.strip()
+            if len(line) > 0:
+                if line.split()[0] == "Step":
+                    copy = True
+                    continue
+                elif line.split()[0] == "Loop":
+                    copy = False
+                    continue
+                elif copy:
+                    #print(line)
+                    thermo_data.append(line.split())
+                    
+    thermo_data = pd.DataFrame(thermo_data, columns=['Step', 'TotEng', 'Atoms', 'Volume', 'Temp', 'Press']).astype('float')                 
+    return -1*np.abs(thermo_data.iloc[-1]['Temp'] - target)
 
 # tournament selection
 def selection(pop, scores, k=3):
@@ -106,13 +127,17 @@ def run_lammps(temp, press, state, gen):
         print('Gen: ', gen, '    Sample: ', p, '    State: ', state, '    Temp: ', temp[p], '    Press: ', press[p], flush=True)
         newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(press[p]))
         newdata = newdata.replace("variable       T equal 1000.0","variable       T equal {}".format(temp[p]))
-        newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps+npt_steps)+" output/data.restart-"+str(p))
-        newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom 1000 dump-{}.out id type x y z".format(p)) 
+        #newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps)+" output/data.restart-"+str(p))
+        newdata = newdata.replace("write_restart output/data.restart.*","write_restart output/data.restart-{}.*".format(str(p)))
+        newdata = newdata.replace("run           1000 #1ps","run           {} #1ps".format(str(nve_steps)))
+        newdata = newdata.replace("run           5000 #5ps","run           {} #5ps".format(str(npt_steps)))
+        newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom {} dump-{}.out id type x y z".format(dump_freq,p)) 
         newdata = newdata.replace("write_data    out.data","write_data    out-{}.data".format(p))
     
         if state > 0:
             newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/data.restart-"+str(p)+"."+str(state))
-            newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-"+str(p))
+            #newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-"+str(p))
+            
     
         fileout = "input/in."+str(p)
         f = open(fileout,'w')
@@ -120,22 +145,24 @@ def run_lammps(temp, press, state, gen):
         f.close()
 
     # run LAMMPS for each candidate in the population
-    #print("Start running LAMMPS["+str(gen)+"]")
+    print("Start running LAMMPS["+str(gen)+"]")
     os.system('bash ./run_lammps.sh '+str(n_pop)+' 0')
-    #print("End running LAMMPS["+str(gen)+"]")
-    #print()
+    print("End running LAMMPS["+str(gen)+"]")
+    print()
 
 
     os.system('mv  out-* output')
     os.system('mv  dump-* output')
     
+    '''
     for p in range(n_pop):
 
         if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
+            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,nve_steps):
                 os.system('rm output/data.restart-'+str(p)+"."+str(i))
         elif state > 0:
             os.system('rm output/data.restart-'+str(p)+"."+str(state))
+    '''
 
 
 
@@ -151,17 +178,21 @@ def best_lammps(temp, press, state, gen):
     f.close()
 
     # generate the LAMMPS input files for the best candidate in the population
+    print('Gen: ', gen, '    Sample: best', '    State: ', state, '    Temp: ', temp[0], '    Press: ', press[0], flush=True)
     # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
     newdata = filedata.replace("variable       P equal 1000.0","variable       P equal {}".format(press[0]))
     newdata = newdata.replace("variable       T equal 1000.0","variable       T equal {}".format(temp[0]))
-    newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps+npt_steps)+" output/data.restart-best")
-    newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom 1000 dump-best-{}.out id type x y z".format(str(state)))
+    #newdata = newdata.replace("restart       6000 output/data.restart","restart      "+str(nve_steps)+" output/data.restart-best")
+    newdata = newdata.replace("write_restart output/data.restart.*","write_restart output/data.restart-best.*")
+    newdata = newdata.replace("run           1000 #1ps","run           {} #1ps".format(str(nve_steps)))
+    newdata = newdata.replace("run           5000 #5ps","run           {} #5ps".format(str(npt_steps)))
+    newdata = newdata.replace("dump          1 all custom 1000 dump.out id type x y z","dump          1 all custom {} dump-best-{}.out id type x y z".format(dump_freq, str(state)))
     newdata = newdata.replace("write_data    out.data","write_data    out-best-{}.data".format(str(state)))
     
     
     if state > 0:
         newdata = newdata.replace("read_restart   output/data.restart.6000","read_restart    output/data.restart-best."+str(state))
-        newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-best")
+        #newdata = newdata.replace("restart 1000 output/data.restart","restart 1000 output/data.restart-best")
     fileout = "input/in.best"
     f = open(fileout,'w')
     f.write(newdata)
@@ -176,14 +207,16 @@ def best_lammps(temp, press, state, gen):
     os.system('mv  out-* output')
     os.system('mv  dump-* output')
     
+    '''    
     if state > 0 and state > (nve_steps+npt_steps):
-        for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
+        for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,nve_steps):
             os.system('rm output/data.restart-best.'+str(i))
     elif state > 0:
         os.system('rm output/data.restart-best.'+str(state))
+    '''        
 
+    
 # run neural networks
-
 def run_networks(pop, temp, press, node_input, n):
 
     for p in range(n):
@@ -206,13 +239,13 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_layer):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_layer)
 
-        temp[p] += node_output[0]*100
+        temp[p] += node_output[0]*1000
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
         if temp[p] < bounds[0][0]:
             temp[p] = bounds[0][0]
         
-        press[p] += node_output[1]*10000
+        press[p] += node_output[1]*100000
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
         if press[p] < bounds[1][0]:
@@ -224,9 +257,14 @@ def run_networks(pop, temp, press, node_input, n):
 
 def evaluate(pop, gen, n):
 
-    temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
-    press = np.random.uniform(bounds[1][0], bounds[1][1], n)
-    # run LAMMPS
+    #temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
+    #press = np.random.uniform(bounds[1][0], bounds[1][1], n)
+    
+    temp = np.repeat(np.array([1000]), n)
+    press = np.repeat(np.array([100000]), n)
+    
+    
+    # run LAMMPS with initial structure
     if gen < n_iter:
         print("Running for Gen %s, Using initial structure set-up" %str(gen))
         run_lammps(temp, press, 0, gen) 
@@ -234,6 +272,8 @@ def evaluate(pop, gen, n):
         print("Running for Best candidate, Using initial structure set-up")
         best_lammps(temp, press, 0, n_iter)
 
+        
+    # run LAMMPS with restart files
     for s in range(n_steps):
         node_input = s * 1./n_steps 
         # run neural networks
@@ -246,11 +286,16 @@ def evaluate(pop, gen, n):
         else:
             print("Running for Best candidate, Nstep %s" %(str(s)))
             best_lammps(temp, press, state, n_iter)
-
+    
+    # TO DO:
+    # Improve below code to remove all restart files
+    # Remove unnecessary LAMMPS files
+    state = n_steps*npt_steps+npt_steps+nve_steps
+    os.system('rm output/data.restart-*')
+    '''    
     for p in range(n):
-        state = n_steps*npt_steps+npt_steps+nve_steps
         if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
+            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,nve_steps):
                 if gen < n_iter:
                     os.system('rm output/data.restart-'+str(p)+"."+str(i))
                 else:
@@ -261,18 +306,24 @@ def evaluate(pop, gen, n):
                 os.system('rm output/data.restart-'+str(p)+"."+str(state))
             else:
                 os.system('rm output/data.restart-best.'+str(state))
+    '''
+
+    
 
     scores = []
     for p in range(n):
         if gen < n_iter:
-            filein = "output/out-"+str(p)+".data"
+            #filein = "output/out-"+str(p)+".data"
+            filein = "output/out."+str(p)
         else:
-            os.system('cp output/out-best-'+str(state - npt_steps)+'.data output/out-best.data')
-            filein = "output/out-best.data"
+            #os.system('cp output/out-best-'+str(state - npt_steps)+'.data output/out-best.data')
+            #filein = "output/out-best.data"
+            filein = "output/out.best"            
         
         #--------------Getting Fp difference----------------
         
-        fp_Diff = scoring(cfp, filein)
+        #fp_Diff = scoring(cfp, filein)
+        fp_Diff = scoring_temp(filein)
 
         #------------------------------------
 

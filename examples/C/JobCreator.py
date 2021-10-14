@@ -29,7 +29,7 @@ def job_script(outfile,npop,opt):
         outfile.write("#SBATCH -C knl\n")
         outfile.write("#SBATCH -q debug\n")
         outfile.write("#SBATCH -J l2g_lammps\n")
-        outfile.write("#SBATCH -t 00:05:00\n")
+        outfile.write("#SBATCH -t 00:29:00\n")
         
         outfile.write("\n\n")
         
@@ -49,10 +49,10 @@ def job_script(outfile,npop,opt):
         
         for i in range(npop):
             if opt==1:
-                outfile.write("srun -N 1 -n 64 -c 1 --cpu-bind=cores lmp_cori  -in $HOME/input/in.best> $OUTPUT_DIR/out.best &\n")
+                outfile.write("srun -N 1 -n 64 -c 1 --cpu-bind=cores lmp_cori  -in $HOME/input/in.best>> $OUTPUT_DIR/out.best &\n")
                 outfile.write("\n")
             else: 
-                outfile.write("srun -N 1 -n 64 -c 1 --cpu-bind=cores lmp_cori  -in $HOME/input/in.{}> $OUTPUT_DIR/out.{} &\n".format(i,i))
+                outfile.write("srun -N 1 -n 64 -c 1 --cpu-bind=cores lmp_cori  -in $HOME/input/in.{}>> $OUTPUT_DIR/out.{} &\n".format(i,i))
                 outfile.write("\n")
                 
         outfile.write("wait\n")

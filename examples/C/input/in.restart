@@ -29,13 +29,13 @@ velocity      all create ${T} 4928459 rot yes dist gaussian
 fix           1 all npt temp ${T} ${T} 1.0 iso ${P} ${P} 10.0
 dump          1 all custom 1000 dump.out id type x y z
 #restart       6000 output/data.restart
-restart 1000 output/data.restart
+#restart 1000 output/data.restart
 
 timestep      0.001 #1fs
 run           5000 #5ps
 
 write_data    out.data
-
+write_restart output/data.restart.*
 #-----------------------------------------------
 
 

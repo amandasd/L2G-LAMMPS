@@ -41,8 +41,8 @@ run           1000 #1ps
 unfix         1
 fix           2 all npt temp ${T} ${T} 1.0 iso ${P} ${P} 10.0
 dump          1 all custom 1000 dump.out id type x y z
-restart       6000 output/data.restart
+#restart       6000 output/data.restart
 run           5000 #5ps
 write_data    out.data
-
+write_restart output/data.restart.*
 #-----------------------------------------------
