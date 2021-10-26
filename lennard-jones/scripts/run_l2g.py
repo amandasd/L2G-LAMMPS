@@ -36,10 +36,12 @@ args = parser.parse_args()
 # parameters
 #################################################################################
 
-# define LAMMPS parameters
+# define Lennard-Jones parameters
 bounds = [[0.4, 2],  [0.5, 1]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
-epsilon = 4.77
-sigma = 1.0
+lj_epsilon = 4.77
+lj_sigma = 1.0
+
+# define LAMMPS parameters
 nve_steps = 1000
 npt_steps = 5000
 n_steps = 3 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
@@ -49,6 +51,7 @@ n_iter = 3 # define the total iterations
 n_pop = 16 # define the population size
 r_mut = 0.9 # mutation rate
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
+elitism = True
 
 # define neural network parameters 
 input_layer  = 1 
@@ -207,7 +210,7 @@ def run_networks(pop, temp, press, node_input, n):
 # evaluate all candidates in the population
 def evaluate(pop, gen, n):
 
-    #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation?
+    #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation? Or are they fixed values?
     if gen < 0:
         temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
         press = np.random.uniform(bounds[1][0], bounds[1][1], n)
@@ -313,6 +316,10 @@ for gen in range(n_iter): # maximum number of iterations
     children = list()
     for i in range(0, n_pop):
         c = selected[i]
+        #copy the best candidate to next generation without mutation
+        if elitism:
+            children.append(c)
+            continue
         # mutation: change weights and bias of neural networks
         mutation(c, 0, 0.01, r_mut)
         # store for next generation
