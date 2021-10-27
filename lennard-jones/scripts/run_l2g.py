@@ -105,6 +105,9 @@ def run_lammps(temp, press, state, gen):
         newdata = newdata.replace("orderparameter_timeave.txt","output/scores-"+str(p)+".txt")
         newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/lj.restart-"+str(p))
         newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[p])+" "+str(temp[p])+" "+str(temp[p])+" iso "+str(press[p])+" "+str(press[p])+" "+str(press[p]))
+        newdata = newdata.replace("# run steps in the NVE ensemble\nrun 1000", "# run steps in the NVE ensemble\nrun "+str(nve_steps))
+        newdata = newdata.replace("# run more steps in the NPT ensemble\nrun 5000", "# run more steps in the NPT ensemble\nrun "+str(npt_steps))
+
         if state > 0:
             newdata = newdata.replace("read_restart output/lj.restart.6000","read_restart output/lj.restart-"+str(p)+"."+str(state))
             newdata = newdata.replace("fix 1 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 1 all npt temp "+str(temp[p])+" "+str(temp[p])+" "+str(temp[p])+" iso "+str(press[p])+" "+str(press[p])+" "+str(press[p]))
@@ -148,6 +151,9 @@ def best_lammps(temp, press, state, gen):
     newdata = newdata.replace("orderparameter_timeave.txt","output/scores-best.txt")
     newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/lj.restart-best")
     newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[0])+" "+str(temp[0])+" "+str(temp[0])+" iso "+str(press[0])+" "+str(press[0])+" "+str(press[0]))
+    newdata = newdata.replace("# run steps in the NVE ensemble\nrun 1000", "# run steps in the NVE ensemble\nrun "+str(nve_steps))
+    newdata = newdata.replace("# run more steps in the NPT ensemble\nrun 5000", "# run more steps in the NPT ensemble\nrun "+str(npt_steps))
+
     if state > 0:
         newdata = newdata.replace("read_restart output/lj.restart.6000","read_restart output/lj.restart-best."+str(state))
         newdata = newdata.replace("fix 1 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 1 all npt temp "+str(temp[0])+" "+str(temp[0])+" "+str(temp[0])+" iso "+str(press[0])+" "+str(press[0])+" "+str(press[0]))
@@ -207,7 +213,7 @@ def run_networks(pop, temp, press, node_input, n):
 
     return temp, press
 
-# evaluate all candidates in the population
+# evaluate all candidates in the population: run neural networks and LAMMPS
 def evaluate(pop, gen, n):
 
     #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation? Or are they fixed values?

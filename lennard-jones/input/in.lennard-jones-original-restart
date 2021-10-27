@@ -65,5 +65,4 @@ dump_modify 1 element Ar
 restart 1000 output/lj.restart
 
 # run more steps in the NVT ensemble
-# (this is data production, from which configurations are saved) 
 run 5000

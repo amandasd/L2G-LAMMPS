@@ -83,8 +83,7 @@ fix 1 all nve
 # define time step
 timestep 0.005
 
-# run 1000 steps in the NVE ensemble
-# (this equilibrates positions)
+# run steps in the NVE ensemble
 run 1000
 
 # stop fix with given fixid
@@ -117,5 +116,4 @@ dump_modify 1 element Ar
 restart 6000 output/lj.restart
 
 # run more steps in the NPT ensemble
-# (this is data production, from which configurations are saved) 
 run 5000
