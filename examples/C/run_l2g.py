@@ -30,22 +30,26 @@ from carbon_phase_fp_data import carbon_fp
 #################################################################################
 
 # define LAMMPS parameters
-bounds = [[100, 5000],  [1, 250000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
-nve_steps = 1000
-npt_steps = 2000
-n_steps = 5 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
-dump_freq = 500
+bounds = [[100, 5000],  [1, 1500000]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
+nve_steps = 10000
+npt_steps = 250000
+n_steps = 20 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+dump_freq = 10000
 
 # define evolutionary algorithm parameters
 n_iter = 20 # define the total iterations
 n_pop = 16 # define the population size
-r_mut = 0.5 # mutation rate
+r_mut = 1 # mutation rate
+sigma_mut = 0.1 # std. for mutation change in weights
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
 
 # define neural network parameters 
 input_layer  = 1 
 hidden_layer = 10 
 output_layer = 2
+
+# Restart from previous run; restart.dat is required
+restart = True
 
 #################################################################################
 # end of parameters
@@ -55,6 +59,8 @@ output_layer = 2
 # functions
 #################################################################################
 
+'''
+# SCORING FUNCTION FOR CARBON SYSTEM
 def scoring(cfp, filename, ref_phase='diamond'):
     #struct = LammpsData.from_file(filename,atom_style="atomic").structure
     #refStruct = LammpsData.from_file("in.targetStructure",atom_style="atomic").structure
@@ -66,6 +72,35 @@ def scoring(cfp, filename, ref_phase='diamond'):
     Ds_euclidean, Ds_cos = cfp.new_phase_distance(filename)
     dist = Ds_euclidean[ref_phase].values[0] + Ds_cos[ref_phase].values[0]*10  # Distance to TARGET phase
     return -1*dist  # The GA code maximize score; so multiply distance by -1
+'''
+
+# SCORING FUNCTION FOR H2O SYSTEM
+def scoring(filename, ref_phase='CUBIC_DIAMOND', weights = [1,0.5,0.3], frame_id=None):
+    
+    # Use ref_phase='HEX_DIAMOND' for scoring for Hexagonal diamond structure
+    
+    ks = ['IdentifyDiamond.counts.%s'%ref_phase,
+     'IdentifyDiamond.counts.%s_FIRST_NEIGHBOR'%ref_phase,
+     'IdentifyDiamond.counts.%s_SECOND_NEIGHBOR'%ref_phase,
+    ]
+
+    pipeline = import_file(filename)
+    pipeline.modifiers.append(IdentifyDiamondModifier())
+    
+    if frame_id is not None:
+        print('Computing for user-specified frame # %s'%frame_id)
+        data = pipeline.compute(frame_id)
+    elif pipeline.source.num_frames > 1:
+        print('Multiple frames found, computing for last frame')
+        data = pipeline.compute(pipeline.source.num_frames)
+    else:
+        data = pipeline.compute()
+    
+    score = 0
+    for idx,k in enumerate(ks):
+        score += weights[idx] * data.attributes[k]/num_particles
+    
+    return score
 
 
 def scoring_temp(lammps_file, target=3000):
@@ -105,7 +140,8 @@ def mutation(ind, mu, sigma, r_mut):
         if rand() < r_mut:
             ind[i] += random.gauss(mu,sigma)
         else:
-            ind[i] = random.gauss(0,1)
+            #ind[i] = random.gauss(0,1)
+            continue
 #TODO: do I need to check bounds?
 
 
@@ -260,8 +296,8 @@ def evaluate(pop, gen, n):
     #temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
     #press = np.random.uniform(bounds[1][0], bounds[1][1], n)
     
-    temp = np.repeat(np.array([1000]), n)
-    press = np.repeat(np.array([100000]), n)
+    temp = np.repeat(np.array([300]), n)
+    press = np.repeat(np.array([1]), n)
     
     
     # run LAMMPS with initial structure
@@ -313,17 +349,17 @@ def evaluate(pop, gen, n):
     scores = []
     for p in range(n):
         if gen < n_iter:
-            #filein = "output/out-"+str(p)+".data"
-            filein = "output/out."+str(p)
+            filein = "output/out-"+str(p)+".data"
+            #filein = "output/out."+str(p)
         else:
-            #os.system('cp output/out-best-'+str(state - npt_steps)+'.data output/out-best.data')
-            #filein = "output/out-best.data"
-            filein = "output/out.best"            
+            os.system('cp output/out-best-'+str(state - npt_steps)+'.data output/out-best.data')
+            filein = "output/out-best.data"
+            #filein = "output/out.best"            
         
         #--------------Getting Fp difference----------------
         
-        #fp_Diff = scoring(cfp, filein)
-        fp_Diff = scoring_temp(filein)
+        fp_Diff = scoring(cfp, filein)
+        #fp_Diff = scoring_temp(filein)
 
         #------------------------------------
 
@@ -360,12 +396,23 @@ if __name__ == '__main__':
         cfp = pickle.load(f)    
 
     #-------------Restarting section-----------------
-    restart = False
 
     if restart:
-        data = open("restart.dat","r").readlines()[-1]
-        pop = eval(data.split("|")[0])
-        scores = eval(data.split("|")[1])
+        #data = open("restart.dat","r").readlines()[-1]
+        #pop = eval(data.split("|")[0])
+        #scores = eval(data.split("|")[1])
+        best_score = -1000
+        lines = open("restart.dat","r").readlines()
+        for line_idx, data in enumerate(lines):
+            gen_scores = eval(data.split("|")[1])    
+
+            if max(gen_scores) > best_score:
+                pop = eval(data.split("|")[0])
+                scores = eval(data.split("|")[1])
+                best_score = max(gen_scores)
+
+                print('Gen:', line_idx, 'in previous run had better score. Selecting that...')        
+        
 
     else:
         # generate a random initial population: weights and bias of neural networks
@@ -397,12 +444,14 @@ if __name__ == '__main__':
         # n_best candidates are selected to generate new candidates
         selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
 
+        # TO DO:
+        # Add the best scoring candidate  
         # create the next generation
         children = list()
         for i in range(0, n_pop):
             c = selected[i]
             # mutation: change weights and bias of neural networks
-            mutation(c, 0, 0.01, r_mut)
+            mutation(c, 0, sigma_mut, r_mut)
             # store for next generation
             children.append(c)
         # replace population

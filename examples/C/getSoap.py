@@ -60,3 +60,25 @@ def Get_SOAP(structure):
     return periodic_soap.create(ASEobject)
 
 
+def Get_atomic_SOAP(structure):
+    '''
+    For creation of SOAP Fingerpeinting
+    '''
+    ASEobject = StructureToAse(structure)
+    species = list(set(get_species(structure)))
+    rcut = 6
+    nmax = 6
+    lmax = 4
+    #rbf = 'polynomial'
+    periodic_soap = SOAP(
+        species=species,
+        rcut=rcut,
+        nmax=nmax,
+        lmax=nmax,
+        periodic=True,
+        sparse=False,
+    )
+    
+    return periodic_soap.create(ASEobject)
+
+
