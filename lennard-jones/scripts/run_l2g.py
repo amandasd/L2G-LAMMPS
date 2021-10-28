@@ -36,19 +36,15 @@ args = parser.parse_args()
 # parameters
 #################################################################################
 
-# define Lennard-Jones parameters
-bounds = [[0.4, 2],  [0.5, 1]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
-lj_epsilon = 4.77
-lj_sigma = 1.0
-
 # define LAMMPS parameters
+bounds = [[0.4, 2],  [0.5, 1]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
 nve_steps = 1000
 npt_steps = 5000
 n_steps = 3 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
 
 # define evolutionary algorithm parameters
-n_iter = 3 # define the total iterations
-n_pop = 16 # define the population size
+n_iter = 1 # define the total iterations
+n_pop = 8 # define the population size
 r_mut = 0.9 # mutation rate
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
 elitism = True
@@ -125,17 +121,6 @@ def run_lammps(temp, press, state, gen):
     os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(args.number_of_gpus)+' 0')
     #print("End running LAMMPS["+str(gen)+"]")
     #print()
-    
-    # delete xyz and restart files
-    for p in range(n_pop):
-        os.system('rm output/data.lennard-jones-'+str(p)+'.xyz')
-        os.system('rm output/out.lennard-jones-'+str(p))
-        if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
-                os.system('rm output/lj.restart-'+str(p)+"."+str(i))
-        elif state > 0:
-            os.system('rm output/lj.restart-'+str(p)+"."+str(state))
-
 
 # run LAMMPS for the best candidate in the population
 def best_lammps(temp, press, state, gen):
@@ -174,14 +159,6 @@ def best_lammps(temp, press, state, gen):
     #print("End running LAMMPS["+str(gen)+"]")
     #print()
     
-    # delete restart files
-    if state > 0 and state > (nve_steps+npt_steps):
-        for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
-            os.system('rm output/lj.restart-best.'+str(i))
-    elif state > 0:
-        os.system('rm output/lj.restart-best.'+str(state))
-
-
 # run neural networks
 def run_networks(pop, temp, press, node_input, n):
 
@@ -220,7 +197,7 @@ def run_networks(pop, temp, press, node_input, n):
     return temp, press
 
 
-def get_scores(gen, n)
+def get_scores(gen, n):
     scores = []
     for p in range(n):
         if gen <= n_iter:
@@ -240,13 +217,13 @@ def get_scores(gen, n)
 
 
 # initialize temperature and pressure values
-def initialize_T_P(n, opt, vtemp=None, vpress=None)
+def initialize_T_P(n, opt, vtemp=None, vpress=None):
     if opt == 0:
         temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
         press = np.random.uniform(bounds[1][0], bounds[1][1], n)
     elif opt == 1:
-        temp = np.full(n, vtemp)
-        press = np.full(n, vpress)
+        temp  = np.full(n, vtemp, dtype=float)
+        press = np.full(n, vpress, dtype=float)
     elif opt == 2:
         for p in range(n):
             temp[p] = vtemp + random.gauss(0,0.01)
@@ -288,11 +265,21 @@ def evaluate(pop, gen, n):
         else:
             best_lammps(temp, press, state, gen)
 
-    # delete restart files
+    # calculate scores
+    scores = get_scores(gen, n)
+    
+    delete_output_files(state, gen, n)
+
+    return scores
+
+
+def delete_output_files(state, gen, n):
     for p in range(n):
-        state = n_steps*npt_steps+npt_steps+nve_steps
+        # delete restart files
+        ini_state = npt_steps+nve_steps
+        end_state = n_steps*npt_steps+npt_steps+nve_steps
         if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
+            for i in np.arange(ini_state,end_state+nve_steps,1000):
                 if gen <= n_iter:
                     os.system('rm output/lj.restart-'+str(p)+"."+str(i))
                 else:
@@ -302,11 +289,10 @@ def evaluate(pop, gen, n):
                 os.system('rm output/lj.restart-'+str(p)+"."+str(state))
             else:
                 os.system('rm output/lj.restart-best.'+str(state))
+        # delete xyz and out files
+        os.system('rm output/data.lennard-jones-'+str(p)+'.xyz')
+        os.system('rm output/out.lennard-jones-'+str(p))
 
-    # calculate scores
-    scores = get_scores(gen, n)
-
-    return scores
 
 #################################################################################
 # end of functions
