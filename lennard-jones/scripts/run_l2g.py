@@ -321,11 +321,12 @@ for gen in range(n_iter): # maximum number of iterations
     # create the next generation
     children = list()
     for i in range(0, n_pop):
-        c = selected[i]
         #copy the best candidate to next generation without mutation
         if elitism:
-            children.append(c)
+            children.append(pop[idx])
+            elitism = False
             continue
+        c = selected[i]
         # mutation: change weights and bias of neural networks
         mutation(c, 0, 0.01, r_mut)
         # store for next generation
