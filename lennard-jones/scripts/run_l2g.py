@@ -223,7 +223,7 @@ def run_networks(pop, temp, press, node_input, n):
 def get_scores(gen, n)
     scores = []
     for p in range(n):
-        if gen < n_iter:
+        if gen <= n_iter:
             filein = "output/scores-"+str(p)+".txt"
         else:
             filein = "output/scores-best.txt"
@@ -272,10 +272,10 @@ def evaluate(pop, gen, n):
     temp, press = initialize_T_P(n, 1, 1, 0.7) 
 
     # run LAMMPS
-    if gen < n_iter:
+    if gen <= n_iter:
         run_lammps(temp, press, 0, gen) 
     else:
-        best_lammps(temp, press, 0, n_iter)
+        best_lammps(temp, press, 0, gen)
 
     for s in range(n_steps):
         node_input = s * 1./n_steps 
@@ -283,22 +283,22 @@ def evaluate(pop, gen, n):
         temp, press = run_networks(pop, temp, press, node_input, n)
         state = s*npt_steps+npt_steps+nve_steps
         # run LAMMPS
-        if gen < n_iter:
+        if gen <= n_iter:
             run_lammps(temp, press, state, gen) 
         else:
-            best_lammps(temp, press, state, n_iter)
+            best_lammps(temp, press, state, gen)
 
     # delete restart files
     for p in range(n):
         state = n_steps*npt_steps+npt_steps+nve_steps
         if state > 0 and state > (nve_steps+npt_steps):
             for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
-                if gen < n_iter:
+                if gen <= n_iter:
                     os.system('rm output/lj.restart-'+str(p)+"."+str(i))
                 else:
                     os.system('rm output/lj.restart-best.'+str(i))
         elif state > 0:
-            if gen < n_iter:
+            if gen <= n_iter:
                 os.system('rm output/lj.restart-'+str(p)+"."+str(state))
             else:
                 os.system('rm output/lj.restart-best.'+str(state))
@@ -328,12 +328,12 @@ random.seed(datetime.now())
 pop = [[random.gauss(0,1) for _ in range(hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer)] for _ in range(n_pop)]
 
 # evaluate all candidates in the population: run neural networks and LAMMPS
-scores = evaluate(pop, -1, n_pop)
+scores = evaluate(pop, 0, n_pop)
 
 # select the best candidate 
 idx = scores.index(max(scores))
 best, best_eval = pop[idx], scores[idx]
-print(">-1, new best = %f" % (best_eval))
+print(">0, new best = %f" % (best_eval))
 print()
 
 for gen in range(n_iter): # maximum number of iterations
@@ -362,17 +362,17 @@ for gen in range(n_iter): # maximum number of iterations
     pop = children
 
     # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, gen, n_pop)
+    scores = evaluate(pop, gen+1, n_pop)
 
     # select the best candidate
     idx = scores.index(max(scores))
     if scores[idx] > best_eval:
         best, best_eval = pop[idx], scores[idx]
-        print(">%d, new best = %f" % (gen, best_eval))
+        print(">%d, new best = %f" % (gen+1, best_eval))
         print()
 
 # evaluate the best candidate
-scores = evaluate([pop[idx]], n_iter, 1)
+scores = evaluate([pop[idx]], n_iter+1, 1)
 print("best = %f" % (scores[0]))
 
 #################################################################################
