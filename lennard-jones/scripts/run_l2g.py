@@ -76,6 +76,7 @@ def selection(pop, scores, k=3):
     	    selection_ix = ix
     return pop[selection_ix]
 
+
 # mutation operator
 def mutation(ind, mu, sigma, r_mut):
     for i in range(len(ind)):
@@ -85,6 +86,7 @@ def mutation(ind, mu, sigma, r_mut):
         else:
             ind[i] = random.gauss(0,1)
 #TODO: do I need to check bounds?
+
 
 # run LAMMPS for all candidates in the population
 def run_lammps(temp, press, state, gen):
@@ -124,6 +126,7 @@ def run_lammps(temp, press, state, gen):
     #print("End running LAMMPS["+str(gen)+"]")
     #print()
     
+    # delete restart files
     for p in range(n_pop):
         os.system('rm output/data.lennard-jones-'+str(p)+'.xyz')
         os.system('rm output/out.lennard-jones-'+str(p))
@@ -132,6 +135,7 @@ def run_lammps(temp, press, state, gen):
                 os.system('rm output/lj.restart-'+str(p)+"."+str(i))
         elif state > 0:
             os.system('rm output/lj.restart-'+str(p)+"."+str(state))
+
 
 # run LAMMPS for the best candidate in the population
 def best_lammps(temp, press, state, gen):
@@ -170,11 +174,13 @@ def best_lammps(temp, press, state, gen):
     #print("End running LAMMPS["+str(gen)+"]")
     #print()
     
+    # delete restart files
     if state > 0 and state > (nve_steps+npt_steps):
         for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,1000):
             os.system('rm output/lj.restart-best.'+str(i))
     elif state > 0:
         os.system('rm output/lj.restart-best.'+str(state))
+
 
 # run neural networks
 def run_networks(pop, temp, press, node_input, n):
@@ -213,10 +219,33 @@ def run_networks(pop, temp, press, node_input, n):
 
     return temp, press
 
+
+def get_scores(gen, n)
+
+    scores = []
+    for p in range(n):
+        if gen < n_iter:
+            filein = "output/scores-"+str(p)+".txt"
+        else:
+            filein = "output/scores-best.txt"
+        f = open(filein,'r')
+        lines = f.readlines()
+        f.close()
+        if args.measure_of_assembly == 1: #Q6 bond-order parameter
+            scores.append(float(lines[2].split(' ')[1]))
+        elif args.measure_of_assembly == 2: #number of contacts per particle
+            scores.append(float(lines[2].split(' ')[2]))
+        else:
+            print("Valid measure of assembly: 1 (Q6 bond-order parameter) or 2 (number of contacts per particle)")
+
+    return scores
+
+
 # evaluate all candidates in the population: run neural networks and LAMMPS
 def evaluate(pop, gen, n):
 
     #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation? Or are they fixed values?
+    # initialize temperature and pressure values
     if gen < 0:
         temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
         press = np.random.uniform(bounds[1][0], bounds[1][1], n)
@@ -250,6 +279,7 @@ def evaluate(pop, gen, n):
         else:
             best_lammps(temp, press, state, n_iter)
 
+    # delete restart files
     for p in range(n):
         state = n_steps*npt_steps+npt_steps+nve_steps
         if state > 0 and state > (nve_steps+npt_steps):
@@ -264,21 +294,9 @@ def evaluate(pop, gen, n):
             else:
                 os.system('rm output/lj.restart-best.'+str(state))
 
-    scores = []
-    for p in range(n):
-        if gen < n_iter:
-            filein = "output/scores-"+str(p)+".txt"
-        else:
-            filein = "output/scores-best.txt"
-        f = open(filein,'r')
-        lines = f.readlines()
-        f.close()
-        if args.measure_of_assembly == 1: #Q6 bond-order parameter
-            scores.append(float(lines[2].split(' ')[1])) 
-        elif args.measure_of_assembly == 2: #number of contacts per particle
-            scores.append(float(lines[2].split(' ')[2])) 
-        else:
-            print("Valid measure of assembly: 1 (Q6 bond-order parameter) or 2 (number of contacts per particle)")
+    # calculate scores
+    scores = get_scores(gen, n)
+
     return scores
 
 #################################################################################
