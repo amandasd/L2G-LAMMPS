@@ -126,7 +126,7 @@ def run_lammps(temp, press, state, gen):
     #print("End running LAMMPS["+str(gen)+"]")
     #print()
     
-    # delete restart files
+    # delete xyz and restart files
     for p in range(n_pop):
         os.system('rm output/data.lennard-jones-'+str(p)+'.xyz')
         os.system('rm output/out.lennard-jones-'+str(p))
@@ -221,7 +221,6 @@ def run_networks(pop, temp, press, node_input, n):
 
 
 def get_scores(gen, n)
-
     scores = []
     for p in range(n):
         if gen < n_iter:
@@ -237,30 +236,40 @@ def get_scores(gen, n)
             scores.append(float(lines[2].split(' ')[2]))
         else:
             print("Valid measure of assembly: 1 (Q6 bond-order parameter) or 2 (number of contacts per particle)")
-
     return scores
+
+
+# initialize temperature and pressure values
+def initialize_T_P(n, opt, vtemp=None, vpress=None)
+    if opt == 0:
+        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
+        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
+    elif opt == 1:
+        temp = np.full(n, vtemp)
+        press = np.full(n, vpress)
+    elif opt == 2:
+        for p in range(n):
+            temp[p] = vtemp + random.gauss(0,0.01)
+            if temp[p] > bounds[0][1]:
+                temp[p] = bounds[0][1]
+            if temp[p] < bounds[0][0]:
+                temp[p] = bounds[0][0]
+            press[p] = vpress + random.gauss(0,0.01)
+            if press[p] > bounds[1][1]:
+                press[p] = bounds[1][1]
+            if press[p] < bounds[1][0]:
+                press[p] = bounds[1][0]
+    else:
+        print("Valid options: 0 (random), 1 (mutated from a given value), 2 (fixed values)")
+
+    return temp, press
 
 
 # evaluate all candidates in the population: run neural networks and LAMMPS
 def evaluate(pop, gen, n):
 
-    #TODO: for a new generation, are temp/press random values? Or are they the last values used in the simulation? Or are they fixed values?
-    # initialize temperature and pressure values
-    if gen < 0:
-        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
-        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
-    else:
-        for p in range(n):
-            temp[p] += random.gauss(0,0.01)
-            if temp[p] > bounds[0][1]:
-                temp[p] = bounds[0][1]
-            if temp[p] < bounds[0][0]:
-                temp[p] = bounds[0][0]
-            press[p] += random.gauss(0,0.01)
-            if press[p] > bounds[1][1]:
-                press[p] = bounds[1][1]
-            if press[p] < bounds[1][0]:
-                press[p] = bounds[1][0]
+    # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
+    temp, press = initialize_T_P(n, 1, 1, 0.7) 
 
     # run LAMMPS
     if gen < n_iter:
