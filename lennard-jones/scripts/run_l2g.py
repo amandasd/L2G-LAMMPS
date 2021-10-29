@@ -73,7 +73,7 @@ if n_best > n_pop:
 
 # define neural network parameters 
 input_nodes  = 1
-hidden_nodes = args.hidden_nodes
+hidden_nodes = args.number_of_hidden_nodes
 output_nodes = 2
 
 #################################################################################
