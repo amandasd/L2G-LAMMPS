@@ -44,7 +44,7 @@ import module_lammps as lmp
 #################################################################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of nodes [default=1]")
+parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of gpus [default=1]")
 parser.add_argument("-restart", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
 
 # genetic algorithm parameters
