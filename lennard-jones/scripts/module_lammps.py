@@ -56,10 +56,7 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
         f.close()
 
     # run LAMMPS for each candidate in the population
-    #print("Start running LAMMPS["+str(gen)+"]")
     os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0')
-    #print("End running LAMMPS["+str(gen)+"]")
-    #print()
 
 
 # run LAMMPS for the best candidate in the population
@@ -94,10 +91,7 @@ def best_lammps(temp, press, state, gen):
     f.close()
 
     # run LAMMPS for each candidate in the population
-    #print("Start running LAMMPS["+str(gen)+"]")
     os.system('./scripts/run_lammps.sh 1 1 1')
-    #print("End running LAMMPS["+str(gen)+"]")
-    #print()
     
 
 def get_scores(gen, n, n_iter):
