@@ -16,10 +16,8 @@ while [ $p -lt $npop ]; do
       if [ $p -lt $npop ]; then
 	 #echo "Running pop "$p "gpu "$g
 	 if [ $opt -eq 1 ]; then
-            #$LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.lennard-jones-best > $OUTPUT_DIR/out.best &
             $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.best > $OUTPUT_DIR/out.best &
          elif [ $opt -eq 0 ]; then
-            #$LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.lennard-jones-$p > $OUTPUT_DIR/out.$p &
             $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.$p > $OUTPUT_DIR/out.$p &
          fi
       fi
