@@ -190,9 +190,15 @@ random.seed(datetime.now())
 
 # restart L2G from the last state in case it was interrupted
 if args.restart:
-    data = open("restart.dat","r").readlines()[-1]
-    pop = eval(data.split("|")[0])
-    scores = eval(data.split("|")[1])
+    value = -1000
+    lines = open("restart.dat","r").readlines()
+    for line_idx, data in enumerate(lines):
+        gen_scores = eval(data.split("|")[1])    
+        if max(gen_scores) > value:
+            pop = eval(data.split("|")[0])
+            scores = eval(data.split("|")[1])
+            value = max(gen_scores)
+            print('Gen:', line_idx, 'in previous run had better score. Selecting that...')        
 else:
     # generate a random initial population: weights and bias of neural networks
     pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
@@ -234,8 +240,8 @@ for gen in range(n_gen): # maximum number of iterations
     scores = evaluate(pop, gen+1, n_pop)
 
     # save population and scores in order to restart L2G from the last state in case of being interrupted
-    with open("output/restart.dat","a") as outfile:
-        outfile.write("{} | {}\n".format(pop,scores))
+    with open("restart.dat","a") as outfile:
+        outfile.write("{} | {}\n".format([p.tolist() for p in pop],scores))
 
     # select the best candidate
     idx = scores.index(max(scores))
