@@ -33,4 +33,10 @@ conda deactivate
 
 ## Reference
 
+#### Paper
+
 S. Whitelam, I. Tamblyn. "Learning to grow: control of materials self-assembly using evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604 
+
+#### Site
+
+https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/

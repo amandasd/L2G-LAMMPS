@@ -38,9 +38,9 @@ args = parser.parse_args()
 #################################################################################
 
 # define genetic algorithm parameters
-n_iter = 2 # define the total iterations
+n_gen = 2 # define the total iterations
 n_pop = 8 # define the population size
-r_mut = 0.9 # mutation rate
+mut_rate = 0.9 # mutation rate
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
 elitism = True
 
@@ -69,10 +69,10 @@ def selection(pop, scores, k=3):
 
 
 # mutation operator
-def mutation(ind, mu, sigma, r_mut):
+def mutation(ind, mu, sigma, mut_rate):
     for i in range(len(ind)):
         # check for a mutation
-        if rand() < r_mut:
+        if rand() < mut_rate:
             ind[i] += random.gauss(mu,sigma)
         else:
             ind[i] = random.gauss(0,1)
@@ -124,7 +124,7 @@ def evaluate(pop, gen, n):
     temp, press = lmp.initialize_T_P(n, 1, 1, 0.7) 
 
     # run LAMMPS
-    if gen <= n_iter:
+    if gen <= n_gen:
         lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus) 
     else:
         lmp.best_lammps(temp, press, 0, gen)
@@ -135,15 +135,15 @@ def evaluate(pop, gen, n):
         temp, press = run_networks(pop, temp, press, node_input, n)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
         # run LAMMPS
-        if gen <= n_iter:
+        if gen <= n_gen:
             lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus) 
         else:
             lmp.best_lammps(temp, press, state, gen)
 
     # calculate scores
-    scores = lmp.get_scores(gen, n, n_iter)
+    scores = lmp.get_scores(gen, n, n_gen)
     
-    lmp.delete_output_files(state, gen, n, n_iter)
+    lmp.delete_output_files(state, gen, n, n_gen)
 
     return scores
 
@@ -158,7 +158,7 @@ def evaluate(pop, gen, n):
 print()
 print("population size: "+str(n_pop))
 print("number of retained solutions: "+str(n_best)) 
-print("number of iterations: "+str(n_iter))
+print("number of iterations: "+str(n_gen))
 print()
 
 random.seed(datetime.now())
@@ -171,11 +171,11 @@ scores = evaluate(pop, 0, n_pop)
 
 # select the best candidate 
 idx = scores.index(max(scores))
-best, best_eval = pop[idx], scores[idx]
-print(">0, new best = %f" % (best_eval))
+best_ind, best_score = pop[idx], scores[idx]
+print(">0, new best = %f" % (best_score))
 print()
 
-for gen in range(n_iter): # maximum number of iterations
+for gen in range(n_gen): # maximum number of iterations
 
     # rank the scores 
     indices = [scores.index(x) for x in sorted(scores, reverse=True)]
@@ -185,33 +185,33 @@ for gen in range(n_iter): # maximum number of iterations
     selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
     
     # create the next generation
-    children = list()
+    new_pop = list()
     for i in range(0, n_pop):
         #copy the best candidate to next generation without mutation
         if elitism:
-            children.append(pop[idx])
+            new_pop.append(pop[idx])
             elitism = False
             continue
-        c = selected[i]
+        ind = selected[i]
         # mutation: change weights and bias of neural networks
-        mutation(c, 0, 0.01, r_mut)
+        mutation(ind, 0, 0.01, mut_rate)
         # store for next generation
-        children.append(c)
+        new_pop.append(ind)
     # replace population
-    pop = children
+    pop = new_pop
 
     # evaluate all candidates in the population: run neural networks and LAMMPS
     scores = evaluate(pop, gen+1, n_pop)
 
     # select the best candidate
     idx = scores.index(max(scores))
-    if scores[idx] > best_eval:
-        best, best_eval = pop[idx], scores[idx]
-        print(">%d, new best = %f" % (gen+1, best_eval))
+    if scores[idx] > best_score:
+        best_ind, best_score = pop[idx], scores[idx]
+        print(">%d, new best = %f" % (gen+1, best_score))
         print()
 
 # evaluate the best candidate
-scores = evaluate([pop[idx]], n_iter+1, 1)
+scores = evaluate([pop[idx]], n_gen+1, 1)
 print("best = %f" % (scores[0]))
 
 #################################################################################
