@@ -10,6 +10,8 @@ import numpy as np
 import os,sys
 import argparse
 
+import module_lammps as lmp
+
 #################################################################################
 # Learning To Grow: Lennard-Jones potential
 # Objective: maximize Q6 bond-order parameter
@@ -29,21 +31,14 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of nodes [default=1]")
-parser.add_argument("-measure", "--measure-of-assembly", type=int, default=1, help="measure of assembly [default=1]: 1 (Q6 bond-order parameter) or 2 (number of contacts per particle)")
 args = parser.parse_args()
 
 #################################################################################
 # parameters
 #################################################################################
 
-# define LAMMPS parameters
-bounds = [[0.4, 2],  [0.5, 1]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
-nve_steps = 1000
-npt_steps = 5000
-n_steps = 3 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
-
-# define evolutionary algorithm parameters
-n_iter = 1 # define the total iterations
+# define genetic algorithm parameters
+n_iter = 2 # define the total iterations
 n_pop = 8 # define the population size
 r_mut = 0.9 # mutation rate
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
@@ -84,81 +79,6 @@ def mutation(ind, mu, sigma, r_mut):
 #TODO: do I need to check bounds?
 
 
-# run LAMMPS for all candidates in the population
-def run_lammps(temp, press, state, gen):
-    # template to generate the LAMMPS input files for each candidate in the population
-    if state == 0:
-        filein = "input/in.lennard-jones-original"
-    else:
-        filein = "input/in.lennard-jones-original-restart"
-    f = open(filein,'r')
-    filedata = f.read()
-    f.close()
-
-    # generate the LAMMPS input files for each candidate in the population
-    for p in range(n_pop):
-        # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
-        newdata = filedata.replace("velocity all create 1.0 87287 dist gaussian","velocity all create 1.0 "+str(randint(0, 99999999))+" dist gaussian")
-        newdata = newdata.replace("output.xyz","output/data.lennard-jones-"+str(p)+".xyz")
-        newdata = newdata.replace("orderparameter_timeave.txt","output/scores-"+str(p)+".txt")
-        newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/lj.restart-"+str(p))
-        newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[p])+" "+str(temp[p])+" "+str(temp[p])+" iso "+str(press[p])+" "+str(press[p])+" "+str(press[p]))
-        newdata = newdata.replace("# run steps in the NVE ensemble\nrun 1000", "# run steps in the NVE ensemble\nrun "+str(nve_steps))
-        newdata = newdata.replace("# run more steps in the NPT ensemble\nrun 5000", "# run more steps in the NPT ensemble\nrun "+str(npt_steps))
-
-        if state > 0:
-            newdata = newdata.replace("read_restart output/lj.restart.6000","read_restart output/lj.restart-"+str(p)+"."+str(state))
-            newdata = newdata.replace("fix 1 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 1 all npt temp "+str(temp[p])+" "+str(temp[p])+" "+str(temp[p])+" iso "+str(press[p])+" "+str(press[p])+" "+str(press[p]))
-            newdata = newdata.replace("restart 1000 output/lj.restart","restart 1000 output/lj.restart-"+str(p))
-    
-        fileout = "input/in.lennard-jones-"+str(p)
-        f = open(fileout,'w')
-        f.write(newdata)
-        f.close()
-
-    # run LAMMPS for each candidate in the population
-    #print("Start running LAMMPS["+str(gen)+"]")
-    os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(args.number_of_gpus)+' 0')
-    #print("End running LAMMPS["+str(gen)+"]")
-    #print()
-
-# run LAMMPS for the best candidate in the population
-def best_lammps(temp, press, state, gen):
-    # template to generate the LAMMPS input files for each candidate in the population
-    if state == 0:
-        filein = "input/in.lennard-jones-original"
-    else:
-        filein = "input/in.lennard-jones-original-restart"
-    f = open(filein,'r')
-    filedata = f.read()
-    f.close()
-
-    # generate the LAMMPS input files for the best candidate in the population
-    # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
-    newdata = filedata.replace("velocity all create 1.0 87287 dist gaussian","velocity all create 1.0 "+str(randint(0, 99999999))+" dist gaussian")
-    newdata = newdata.replace("output.xyz","output/data.lennard-jones-best.xyz")
-    newdata = newdata.replace("orderparameter_timeave.txt","output/scores-best.txt")
-    newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/lj.restart-best")
-    newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[0])+" "+str(temp[0])+" "+str(temp[0])+" iso "+str(press[0])+" "+str(press[0])+" "+str(press[0]))
-    newdata = newdata.replace("# run steps in the NVE ensemble\nrun 1000", "# run steps in the NVE ensemble\nrun "+str(nve_steps))
-    newdata = newdata.replace("# run more steps in the NPT ensemble\nrun 5000", "# run more steps in the NPT ensemble\nrun "+str(npt_steps))
-
-    if state > 0:
-        newdata = newdata.replace("read_restart output/lj.restart.6000","read_restart output/lj.restart-best."+str(state))
-        newdata = newdata.replace("fix 1 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 1 all npt temp "+str(temp[0])+" "+str(temp[0])+" "+str(temp[0])+" iso "+str(press[0])+" "+str(press[0])+" "+str(press[0]))
-        newdata = newdata.replace("restart 1000 output/lj.restart","restart 1000 output/lj.restart-best")
-    
-    fileout = "input/in.lennard-jones-best"
-    f = open(fileout,'w')
-    f.write(newdata)
-    f.close()
-
-    # run LAMMPS for each candidate in the population
-    #print("Start running LAMMPS["+str(gen)+"]")
-    os.system('./scripts/run_lammps.sh 1 1 1')
-    #print("End running LAMMPS["+str(gen)+"]")
-    #print()
-    
 # run neural networks
 def run_networks(pop, temp, press, node_input, n):
 
@@ -183,61 +103,16 @@ def run_networks(pop, temp, press, node_input, n):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_layer)
 
         temp[p] += node_output[0]
-        if temp[p] > bounds[0][1]:
-            temp[p] = bounds[0][1]
-        if temp[p] < bounds[0][0]:
-            temp[p] = bounds[0][0]
+        if temp[p] > lmp.bounds[0][1]:
+            temp[p] = lmp.bounds[0][1]
+        if temp[p] < lmp.bounds[0][0]:
+            temp[p] = lmp.bounds[0][0]
         
         press[p] += node_output[1]
-        if press[p] > bounds[1][1]:
-            press[p] = bounds[1][1]
-        if press[p] < bounds[1][0]:
-            press[p] = bounds[1][0]
-
-    return temp, press
-
-
-def get_scores(gen, n):
-    scores = []
-    for p in range(n):
-        if gen <= n_iter:
-            filein = "output/scores-"+str(p)+".txt"
-        else:
-            filein = "output/scores-best.txt"
-        f = open(filein,'r')
-        lines = f.readlines()
-        f.close()
-        if args.measure_of_assembly == 1: #Q6 bond-order parameter
-            scores.append(float(lines[2].split(' ')[1]))
-        elif args.measure_of_assembly == 2: #number of contacts per particle
-            scores.append(float(lines[2].split(' ')[2]))
-        else:
-            print("Valid measure of assembly: 1 (Q6 bond-order parameter) or 2 (number of contacts per particle)")
-    return scores
-
-
-# initialize temperature and pressure values
-def initialize_T_P(n, opt, vtemp=None, vpress=None):
-    if opt == 0:
-        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
-        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
-    elif opt == 1:
-        temp  = np.full(n, vtemp, dtype=float)
-        press = np.full(n, vpress, dtype=float)
-    elif opt == 2:
-        for p in range(n):
-            temp[p] = vtemp + random.gauss(0,0.01)
-            if temp[p] > bounds[0][1]:
-                temp[p] = bounds[0][1]
-            if temp[p] < bounds[0][0]:
-                temp[p] = bounds[0][0]
-            press[p] = vpress + random.gauss(0,0.01)
-            if press[p] > bounds[1][1]:
-                press[p] = bounds[1][1]
-            if press[p] < bounds[1][0]:
-                press[p] = bounds[1][0]
-    else:
-        print("Valid options: 0 (random), 1 (mutated from a given value), 2 (fixed values)")
+        if press[p] > lmp.bounds[1][1]:
+            press[p] = lmp.bounds[1][1]
+        if press[p] < lmp.bounds[1][0]:
+            press[p] = lmp.bounds[1][0]
 
     return temp, press
 
@@ -246,53 +121,31 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
 def evaluate(pop, gen, n):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    temp, press = initialize_T_P(n, 1, 1, 0.7) 
+    temp, press = lmp.initialize_T_P(n, 1, 1, 0.7) 
 
     # run LAMMPS
     if gen <= n_iter:
-        run_lammps(temp, press, 0, gen) 
+        lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus) 
     else:
-        best_lammps(temp, press, 0, gen)
+        lmp.best_lammps(temp, press, 0, gen)
 
-    for s in range(n_steps):
-        node_input = s * 1./n_steps 
+    for s in range(lmp.n_steps):
+        node_input = s * 1./lmp.n_steps 
         # run neural networks
         temp, press = run_networks(pop, temp, press, node_input, n)
-        state = s*npt_steps+npt_steps+nve_steps
+        state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
         # run LAMMPS
         if gen <= n_iter:
-            run_lammps(temp, press, state, gen) 
+            lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus) 
         else:
-            best_lammps(temp, press, state, gen)
+            lmp.best_lammps(temp, press, state, gen)
 
     # calculate scores
-    scores = get_scores(gen, n)
+    scores = lmp.get_scores(gen, n, n_iter)
     
-    delete_output_files(state, gen, n)
+    lmp.delete_output_files(state, gen, n, n_iter)
 
     return scores
-
-
-def delete_output_files(state, gen, n):
-    for p in range(n):
-        # delete restart files
-        ini_state = npt_steps+nve_steps
-        end_state = n_steps*npt_steps+npt_steps+nve_steps
-        if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(ini_state,end_state+nve_steps,1000):
-                if gen <= n_iter:
-                    os.system('rm output/lj.restart-'+str(p)+"."+str(i))
-                else:
-                    os.system('rm output/lj.restart-best.'+str(i))
-        elif state > 0:
-            if gen <= n_iter:
-                os.system('rm output/lj.restart-'+str(p)+"."+str(state))
-            else:
-                os.system('rm output/lj.restart-best.'+str(state))
-        # delete xyz and out files
-        os.system('rm output/data.lennard-jones-'+str(p)+'.xyz')
-        os.system('rm output/out.lennard-jones-'+str(p))
-
 
 #################################################################################
 # end of functions
