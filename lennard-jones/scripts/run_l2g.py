@@ -19,35 +19,62 @@ import module_lammps as lmp
 # Varied values of T and P
 # Solution is an array of real values that represent a neural network
 #################################################################################
-# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS]
+# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
+#        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
+#        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-e] [-hid HIDDEN_NODES] [-restart] 
 #
 # optional arguments:
-#  -h, --help                                  show this help message and exit
-#  -gpus, --number-of-gpus NUMBER_OF_GPUS 
-#                                              number of gpus [default=1]
+#  -h, --help                                                           show this help message and exit
+#  -restart, --restart                                                  restart L2G from the last state in case it was interrupted [default=False]
+#  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
+#  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
+#  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
+#  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
+#  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=3]
+#  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
+#  -e,       --elitism                                                  elitism [default=True]
+#  -hid,     --hidden-nodes HIDDEN_NODES                                number of hidden nodes [default=10]
+#
 # Example:
-#    python run_l2g.py -gpus 8
+#    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
 #################################################################################
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of nodes [default=1]")
-args = parser.parse_args()
 
 #################################################################################
 # parameters
 #################################################################################
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of nodes [default=1]")
+parser.add_argument("-restart", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
+
+# genetic algorithm parameters
+parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
+parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
+parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
+parser.add_argument("-ts", "--tournament-size", type=int, default=3, help="tournament size [default=3]")
+parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
+parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
+
+# neural network parameters 
+parser.add_argument("-hid", "--hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
+args = parser.parse_args()
+
 # define genetic algorithm parameters
-n_gen = 2 # define the total iterations
-n_pop = 8 # define the population size
-mut_rate = 0.9 # mutation rate
-n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
-elitism = True
+n_gen    = args.number_of_generations
+n_pop    = args.population_size
+mut_rate = args.mutation_rate
+ts       = args.tournament_size
+n_best   = args.number_of_retained_solutions 
+
+if mut_rate > 1 or mut_rate < 0:
+    mut_rate = 1
+if n_best > n_pop:
+    n_best = int(np.ceil(n_pop * 0.1))
 
 # define neural network parameters 
-input_layer  = 1 
-hidden_layer = 10 
-output_layer = 2
+input_nodes  = 1
+hidden_nodes = args.hidden_nodes
+output_nodes = 2
 
 #################################################################################
 # end of parameters
@@ -58,7 +85,7 @@ output_layer = 2
 #################################################################################
 
 # tournament selection
-def selection(pop, scores, k=3):
+def selection(pop, scores, k=ts):
     # first random selection
     selection_ix = randint(len(pop))
     for ix in randint(0, len(pop), k-1):
@@ -85,22 +112,22 @@ def run_networks(pop, temp, press, node_input, n):
     for p in range(n):
 
         # get weights and bias
-        bias_hidden = pop[p][:hidden_layer]
-        weight_ih = pop[p][hidden_layer:hidden_layer+input_layer*hidden_layer]
-        weight_ih = np.reshape(weight_ih,(input_layer,hidden_layer))
-        weight_ho = pop[p][hidden_layer+input_layer*hidden_layer:hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer]
-        weight_ho = np.reshape(weight_ho,(hidden_layer,output_layer))
+        bias_hidden = pop[p][:hidden_nodes]
+        weight_ih = pop[p][hidden_nodes:hidden_nodes+input_nodes*hidden_nodes]
+        weight_ih = np.reshape(weight_ih,(input_nodes,hidden_nodes))
+        weight_ho = pop[p][hidden_nodes+input_nodes*hidden_nodes:hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes]
+        weight_ho = np.reshape(weight_ho,(hidden_nodes,output_nodes))
  
         # calculate Sj 
-        node_hidden = np.zeros(shape=(hidden_layer), dtype=float)
-        for j in range(hidden_layer):
+        node_hidden = np.zeros(shape=(hidden_nodes), dtype=float)
+        for j in range(hidden_nodes):
             node_hidden[j] = np.sum(np.dot(node_input,weight_ih[:,j]))
         node_hidden = np.tanh(np.add(node_hidden,bias_hidden))
         
         # calculate Sk 
-        node_output = np.zeros(shape=(output_layer), dtype=float)
-        for k in range(output_layer):
-            node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_layer)
+        node_output = np.zeros(shape=(output_nodes), dtype=float)
+        for k in range(output_nodes):
+            node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
         temp[p] += node_output[0]
         if temp[p] > lmp.bounds[0][1]:
@@ -152,22 +179,25 @@ def evaluate(pop, gen, n):
 #################################################################################
 
 #################################################################################
-# learning to grow: main code
+# learning to grow (L2G): main code
 #################################################################################
 
 print()
-print("population size: "+str(n_pop))
-print("number of retained solutions: "+str(n_best)) 
-print("number of iterations: "+str(n_gen))
+print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart))
 print()
 
 random.seed(datetime.now())
 
-# generate a random initial population: weights and bias of neural networks
-pop = [[random.gauss(0,1) for _ in range(hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer)] for _ in range(n_pop)]
-
-# evaluate all candidates in the population: run neural networks and LAMMPS
-scores = evaluate(pop, 0, n_pop)
+# restart L2G from the last state in case it was interrupted
+if args.restart:
+    data = open("restart.dat","r").readlines()[-1]
+    pop = eval(data.split("|")[0])
+    scores = eval(data.split("|")[1])
+else:
+    # generate a random initial population: weights and bias of neural networks
+    pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
+    # evaluate all candidates in the population: run neural networks and LAMMPS
+    scores = evaluate(pop, 0, n_pop)
 
 # select the best candidate 
 idx = scores.index(max(scores))
@@ -188,7 +218,7 @@ for gen in range(n_gen): # maximum number of iterations
     new_pop = list()
     for i in range(0, n_pop):
         #copy the best candidate to next generation without mutation
-        if elitism:
+        if args.elitism:
             new_pop.append(pop[idx])
             elitism = False
             continue
@@ -202,6 +232,10 @@ for gen in range(n_gen): # maximum number of iterations
 
     # evaluate all candidates in the population: run neural networks and LAMMPS
     scores = evaluate(pop, gen+1, n_pop)
+
+    # save population and scores in order to restart L2G from the last state in case of being interrupted
+    with open("output/restart.dat","a") as outfile:
+        outfile.write("{} | {}\n".format(pop,scores))
 
     # select the best candidate
     idx = scores.index(max(scores))

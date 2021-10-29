@@ -27,7 +27,7 @@ export OMP_NUM_THREADS=1
 salloc -C gpu -N <number of nodes> -G <number of gpus> -t <time> -A <account> --exclusive -q special
 
 source activate myenv-3.8
-python3.8 scripts/run_l2g.py -gpus <number of gpus>
+python3.8 scripts/run_l2g.py -gpus <number of gpus> -gen <number of generations> -pop <population size> -mr <mutation rate> -ts <tournament size> -best <number of retained solutions> -elitism -hid <number of hidden nodes>
 conda deactivate
 ```
 
