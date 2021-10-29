@@ -21,7 +21,7 @@ import module_lammps as lmp
 #################################################################################
 # usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
 #        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
-#        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-e] [-hid HIDDEN_NODES] [-restart] 
+#        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] 
 #
 # optional arguments:
 #  -h, --help                                                           show this help message and exit
@@ -33,7 +33,7 @@ import module_lammps as lmp
 #  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=3]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
-#  -hid,     --hidden-nodes HIDDEN_NODES                                number of hidden nodes [default=10]
+#  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
 #
 # Example:
 #    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
@@ -56,7 +56,7 @@ parser.add_argument("-best", "--number-of-retained-solutions", type=int, default
 parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
 
 # neural network parameters 
-parser.add_argument("-hid", "--hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
+parser.add_argument("-hid", "--number-of-hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
 args = parser.parse_args()
 
 # define genetic algorithm parameters
