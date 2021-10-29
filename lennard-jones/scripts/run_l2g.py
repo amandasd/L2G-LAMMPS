@@ -170,7 +170,7 @@ def evaluate(pop, gen, n):
     # calculate scores
     scores = lmp.get_scores(gen, n, n_gen)
     
-    lmp.delete_output_files(state, gen, n, n_gen)
+    lmp.delete_output_files(gen, n, n_gen)
 
     return scores
 

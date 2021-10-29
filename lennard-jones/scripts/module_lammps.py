@@ -134,25 +134,20 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
     return temp, press
 
 
-def delete_output_files(state, gen, n, n_iter):
+def delete_output_files(gen, n, n_iter):
     for p in range(n):
-        # delete restart files
         ini_state = npt_steps+nve_steps
-        end_state = n_steps*npt_steps+npt_steps+nve_steps
-        if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(ini_state,end_state+nve_steps,1000):
-                if gen <= n_iter:
-                    os.system('rm output/restart-'+str(p)+"."+str(i))
-                else:
-                    os.system('rm output/restart-best.'+str(i))
-        elif state > 0:
+        end_state = n_steps*npt_steps+npt_steps+nve_steps+nve_steps
+        # delete restart files
+        for i in np.arange(ini_state,end_state,1000):
             if gen <= n_iter:
-                os.system('rm output/restart-'+str(p)+"."+str(state))
+                os.system('rm output/restart-'+str(p)+"."+str(i))
             else:
-                os.system('rm output/restart-best.'+str(state))
+                os.system('rm output/restart-best.'+str(i))
         # delete xyz and out files
-        os.system('rm output/data-'+str(p)+'.xyz')
-        os.system('rm output/out.'+str(p))
+        if gen <= n_iter:
+            os.system('rm output/data-'+str(p)+'.xyz')
+            os.system('rm output/out.'+str(p))
 
 #################################################################################
 # end of functions
