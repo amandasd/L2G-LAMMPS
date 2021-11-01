@@ -25,7 +25,7 @@ import module_lammps as lmp
 #
 # optional arguments:
 #  -h, --help                                                           show this help message and exit
-#  -restart, --restart                                                  restart L2G from the last state in case it was interrupted [default=False]
+#  -r, --restart                                                        restart L2G from the last state in case it was interrupted [default=False]
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
@@ -45,7 +45,7 @@ import module_lammps as lmp
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of gpus [default=1]")
-parser.add_argument("-restart", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
+parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
 
 # genetic algorithm parameters
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
@@ -150,10 +150,12 @@ def evaluate(pop, gen, n):
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
     temp, press = lmp.initialize_T_P(n, 1, 1, 0.7) 
 
-    # run LAMMPS
+    # run LAMMPS with initial structure 
     if gen <= n_gen:
+        print("[gen %s] running LAMMPS with initial structure" %str(gen))
         lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus) 
     else:
+        print("running LAMMPS with initial structure for best solution")
         lmp.best_lammps(temp, press, 0, gen)
 
     for s in range(lmp.n_steps):
@@ -161,10 +163,12 @@ def evaluate(pop, gen, n):
         # run neural networks
         temp, press = run_networks(pop, temp, press, node_input, n)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
-        # run LAMMPS
+        # run LAMMPS with restart files
         if gen <= n_gen:
+            print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
             lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus) 
         else:
+            print("[step %s] running LAMMPS with restart file for best solution" %(str(s)))
             lmp.best_lammps(temp, press, state, gen)
 
     # calculate scores
@@ -181,78 +185,92 @@ def evaluate(pop, gen, n):
 #################################################################################
 # learning to grow (L2G): main code
 #################################################################################
+if __name__ == '__main__':
 
-print()
-print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart))
-print()
-
-random.seed(datetime.now())
-
-# restart L2G from the last state in case it was interrupted
-if args.restart:
-    value = -1000
-    lines = open("restart.dat","r").readlines()
-    for line_idx, data in enumerate(lines):
-        gen_scores = eval(data.split("|")[1])    
-        if max(gen_scores) > value:
-            pop = eval(data.split("|")[0])
-            scores = eval(data.split("|")[1])
-            value = max(gen_scores)
-            print('Gen:', line_idx, 'in previous run had better score. Selecting that...')        
-else:
-    # generate a random initial population: weights and bias of neural networks
-    pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
-    # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, 0, n_pop)
-
-# select the best candidate 
-idx = scores.index(max(scores))
-best_ind, best_score = pop[idx], scores[idx]
-print(">0, new best = %f" % (best_score))
-print()
-
-for gen in range(n_gen): # maximum number of iterations
-
-    # rank the scores 
-    indices = [scores.index(x) for x in sorted(scores, reverse=True)]
-
-    # select parents from the current population
-    # n_best candidates are selected to generate new candidates
-    selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
+    print()
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart))
+    print()
     
-    # create the next generation
-    new_pop = list()
-    for i in range(0, n_pop):
-        #copy the best candidate to next generation without mutation
-        if args.elitism:
-            new_pop.append(pop[idx])
-            elitism = False
-            continue
-        ind = selected[i]
-        # mutation: change weights and bias of neural networks
-        mutation(ind, 0, 0.01, mut_rate)
-        # store for next generation
-        new_pop.append(ind)
-    # replace population
-    pop = new_pop
+    random.seed(datetime.now())
+    
+    # restart L2G from the last state in case it was interrupted
+    if args.restart:
+        value = -1000
+        lines = open("output/restart.dat","r").readlines()
+        for line_idx, data in enumerate(lines):
+            gen_scores = eval(data.split("|")[1])    
+            if max(gen_scores) > value:
+                pop = eval(data.split("|")[0])
+                scores = eval(data.split("|")[1])
+                value = max(gen_scores)
+    else:
+        # generate a random initial population: weights and bias of neural networks
+        pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
+        # evaluate all candidates in the population: run neural networks and LAMMPS
+        scores = evaluate(pop, 0, n_pop)
 
-    # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, gen+1, n_pop)
-
-    # save population and scores in order to restart L2G from the last state in case of being interrupted
-    with open("restart.dat","a") as outfile:
-        outfile.write("{} | {}\n".format([p.tolist() for p in pop],scores))
-
-    # select the best candidate
+    # select the best candidate 
     idx = scores.index(max(scores))
-    if scores[idx] > best_score:
-        best_ind, best_score = pop[idx], scores[idx]
-        print(">%d, new best = %f" % (gen+1, best_score))
-        print()
+    best_ind, best_score = pop[idx], scores[idx]
+    print()
+    print(">0, new best = %f" % (best_score))
+    print()
+    
+    # delete previous files: restart.dat and dumpfile.dat
+    os.system('rm -f output/restart.dat')
+    os.system('rm -f output/dumpfile.dat')
 
-# evaluate the best candidate
-scores = evaluate([pop[idx]], n_gen+1, 1)
-print("best = %f" % (scores[0]))
+    # save generation, best index, and best score in an output file
+    with open("output/dumpfile.dat","a") as outfile1:
+        outfile1.write("{} {} {}\n".format(0, idx, best_score))
+
+    for gen in range(n_gen): # maximum number of iterations
+
+        # rank the scores 
+        indices = [scores.index(x) for x in sorted(scores, reverse=True)]
+    
+        # select parents from the current population
+        # n_best candidates are selected to generate new candidates
+        selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
+        
+        # create the next generation
+        new_pop = list()
+        for i in range(0, n_pop):
+            #copy the best candidate to next generation without mutation
+            if args.elitism:
+                new_pop.append(pop[idx])
+                elitism = False
+                continue
+            ind = selected[i]
+            # mutation: change weights and bias of neural networks
+            mutation(ind, 0, 0.01, mut_rate)
+            # store for next generation
+            new_pop.append(ind)
+        # replace population
+        pop = new_pop
+    
+        # evaluate all candidates in the population: run neural networks and LAMMPS
+        scores = evaluate(pop, gen+1, n_pop)
+    
+        # save population and scores in order to restart L2G from the last state in case of being interrupted
+        with open("output/restart.dat","a") as outfile2:
+            outfile2.write("{} | {}\n".format(pop,scores))
+    
+        # select the best candidate
+        idx = scores.index(max(scores))
+        if scores[idx] > best_score:
+            best_ind, best_score = pop[idx], scores[idx]
+            print()
+            print(">%d, new best = %f" % (gen+1, best_score))
+            print()
+    
+        # save generation, best index, and best score in an output file
+        with open("output/dumpfile.dat","a") as outfile1:
+            outfile1.write("{} {} {}\n".format(gen+1, idx, best_score))
+    
+    # evaluate the best candidate
+    #scores = evaluate([pop[idx]], n_gen+1, 1)
+    #print("best = %f" % (scores[0]))
 
 #################################################################################
 # end of main code

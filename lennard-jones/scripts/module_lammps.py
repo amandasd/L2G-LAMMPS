@@ -141,13 +141,13 @@ def delete_output_files(gen, n, n_iter):
         # delete restart files
         for i in np.arange(ini_state,end_state,1000):
             if gen <= n_iter:
-                os.system('rm output/restart-'+str(p)+"."+str(i))
+                os.system('rm -f output/restart-'+str(p)+"."+str(i))
             else:
-                os.system('rm output/restart-best.'+str(i))
+                os.system('rm -f output/restart-best.'+str(i))
         # delete xyz and out files
         if gen <= n_iter:
-            os.system('rm output/data-'+str(p)+'.xyz')
-            os.system('rm output/out.'+str(p))
+            os.system('rm -f output/data-'+str(p)+'.xyz')
+            os.system('rm -f output/out.'+str(p))
 
 #################################################################################
 # end of functions
