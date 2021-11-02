@@ -18,6 +18,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 from carbon_phase_fp_data import carbon_fp
 
+from ovito.modifiers import IdentifyDiamondModifier
+from ovito.io import import_file
+
 #################################################################################
 # Learning To Grow: Lennard-Jones potential
 # Objective: maximize Q6 bond-order parameter
@@ -35,6 +38,8 @@ nve_steps = 10000
 npt_steps = 250000
 n_steps = 20 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
 dump_freq = 10000
+t_start = 300
+p_start = 1
 
 # define evolutionary algorithm parameters
 n_iter = 20 # define the total iterations
@@ -43,13 +48,16 @@ r_mut = 1 # mutation rate
 sigma_mut = 0.1 # std. for mutation change in weights
 n_best = max([4, int(np.ceil(n_pop * 0.1))]) # best solutions
 
+t_factor = 1000
+p_factor = 100000
+
 # define neural network parameters 
 input_layer  = 1 
 hidden_layer = 10 
 output_layer = 2
 
 # Restart from previous run; restart.dat is required
-restart = True
+restart = False
 
 #################################################################################
 # end of parameters
@@ -96,6 +104,7 @@ def scoring(filename, ref_phase='CUBIC_DIAMOND', weights = [1,0.5,0.3], frame_id
     else:
         data = pipeline.compute()
     
+    num_particles = data.particles.count
     score = 0
     for idx,k in enumerate(ks):
         score += weights[idx] * data.attributes[k]/num_particles
@@ -275,13 +284,13 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_layer):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_layer)
 
-        temp[p] += node_output[0]*1000
+        temp[p] += node_output[0]*t_factor
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
         if temp[p] < bounds[0][0]:
             temp[p] = bounds[0][0]
         
-        press[p] += node_output[1]*100000
+        press[p] += node_output[1]*p_factor
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
         if press[p] < bounds[1][0]:
@@ -296,8 +305,8 @@ def evaluate(pop, gen, n):
     #temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
     #press = np.random.uniform(bounds[1][0], bounds[1][1], n)
     
-    temp = np.repeat(np.array([300]), n)
-    press = np.repeat(np.array([1]), n)
+    temp = np.repeat(np.array([t_start]), n)
+    press = np.repeat(np.array([p_start]), n)
     
     
     # run LAMMPS with initial structure
@@ -358,7 +367,8 @@ def evaluate(pop, gen, n):
         
         #--------------Getting Fp difference----------------
         
-        fp_Diff = scoring(cfp, filein)
+        fp_Diff = scoring(filein)  # For Ovito Diamond modifier based scoring function
+        #fp_Diff = scoring(cfp, filein) # For FP based scoring function
         #fp_Diff = scoring_temp(filein)
 
         #------------------------------------
