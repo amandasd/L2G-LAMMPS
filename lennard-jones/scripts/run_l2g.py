@@ -24,7 +24,7 @@ import module_lammps as lmp
 #        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
 #        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
-#        [-pmax MAXIMUM_PRESSURE] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
+#        [-pmax MAXIMUM_PRESSURE] [-opt OPT] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
 #        [-tf TEMPERATURE_FACTOR] [-pf PRESSURE_FACTOR]
 #
 # arguments:
@@ -42,6 +42,7 @@ import module_lammps as lmp
 #  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
 #  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
 #  -pmax,    --maximim-pressure MAXIMUM_PRESSURE                        maximum pressure value [default=1]
+#  -opt",    --initialize-T-P OPTION                                    valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required
 #  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
 #  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
 #  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=1]
@@ -75,6 +76,7 @@ parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, h
 parser.add_argument("-tmax", "--maximum-temperature", type=float, default=2, help="maximum temperature value [default=2]")
 parser.add_argument("-pmin", "--minimum-pressure", type=float, default=0.5, help="minimum pressure value [default=0.5]")
 parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="maximum pressure value [default=1]")
+parser.add_argument("-opt", "--initialize-T-P", type=int, choices=[0, 1, 2], default=0, help="valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required")
 parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=1]")
@@ -163,7 +165,7 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
             if press[p] < bounds[1][0]:
                 press[p] = bounds[1][0]
     else:
-        print("Valid options: 0 (random), 1 (mutated from a given value), 2 (fixed values)")
+        print("Valid options: 0 (random), 1 (fixed values), 2 (mutated from a given value)")
 
     return temp, press
 
@@ -210,8 +212,9 @@ def run_networks(pop, temp, press, node_input, n):
 def evaluate(pop, gen, n):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    #arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
-    temp, press = initialize_T_P(n, 1, vtemp, vpress) 
+    # options 1 and 2 require vtemp and vpress values
+    # arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
+    temp, press = initialize_T_P(n, args.initialize_T_P, vtemp, vpress) 
 
     # run LAMMPS with initial structure 
     if gen <= n_gen:
