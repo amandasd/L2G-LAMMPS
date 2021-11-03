@@ -12,13 +12,14 @@ import argparse
 
 import module_lammps as lmp
 
-#################################################################################
-# Learning To Grow: Lennard-Jones potential
-# Objective: maximize Q6 bond-order parameter
-# Fixed values of epsilon and sigma 
-# Varied values of T and P
-# Solution is an array of real values that represent a neural network
-#################################################################################
+#####################################################################################################
+# Learning to Grow algorithm for LAMMPS (L2G)
+# Solution is an array of real values that represents a neural network
+# References
+# 1 - S. Whitelam, I. Tamblyn. "Learning to grow: control of materials self-assembly using
+#     evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604
+# 2 - https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/
+#####################################################################################################
 # usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
 #        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
@@ -48,7 +49,7 @@ import module_lammps as lmp
 #
 # Example:
 #    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
-#################################################################################
+#####################################################################################################
 
 #################################################################################
 # parameters
@@ -245,7 +246,7 @@ def evaluate(pop, gen, n):
 #################################################################################
 
 #################################################################################
-# learning to grow (L2G): main code
+# Learning to Grow for LAMMPS: main code
 #################################################################################
 if __name__ == '__main__':
 
