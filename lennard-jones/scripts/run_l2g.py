@@ -90,6 +90,7 @@ n_pop    = args.population_size
 mut_rate = args.mutation_rate
 ts       = args.tournament_size
 n_best   = args.number_of_retained_solutions 
+elitism  = args.elitism
 
 if mut_rate > 1 or mut_rate < 0:
     mut_rate = 1
@@ -299,7 +300,7 @@ if __name__ == '__main__':
         new_pop = list()
         for i in range(0, n_pop):
             #copy the best candidate to next generation without mutation
-            if args.elitism:
+            if elitism:
                 new_pop.append(pop[idx])
                 elitism = False
                 continue
