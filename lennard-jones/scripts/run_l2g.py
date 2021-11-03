@@ -103,10 +103,6 @@ output_nodes = 2
 
 #define temperature and pressure parameters
 bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]] 
-vtemp = args.initial_temperature
-vpress = args.initial_pressure
-tf = args.temperature_factor
-pf = args.pressure_factor
 
 #################################################################################
 # end of parameters
@@ -193,13 +189,13 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_nodes):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
-        temp[p] += node_output[0] * tf
+        temp[p] += node_output[0] * args.temperature_factor
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
         if temp[p] < bounds[0][0]:
             temp[p] = bounds[0][0]
         
-        press[p] += node_output[1] * pf
+        press[p] += node_output[1] * args.pressure_factor
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
         if press[p] < bounds[1][0]:
@@ -212,9 +208,9 @@ def run_networks(pop, temp, press, node_input, n):
 def evaluate(pop, gen, n):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    # options 1 and 2 require vtemp and vpress values
+    # options 1 and 2 require initial temperature and pressure values
     # arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
-    temp, press = initialize_T_P(n, args.initialize_T_P, vtemp, vpress) 
+    temp, press = initialize_T_P(n, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
 
     # run LAMMPS with initial structure 
     if gen <= n_gen:
@@ -254,7 +250,7 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
     random.seed(datetime.now())
