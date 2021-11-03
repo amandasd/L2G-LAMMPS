@@ -26,7 +26,7 @@ import module_lammps as lmp
 #        [-pmax MAXIMUM_PRESSURE] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
 #        [-tf TEMPERATURE_FACTOR] [-pf PRESSURE_FACTOR]
 #
-# optional arguments:
+# arguments:
 #  -h, --help                                                           show this help message and exit
 #  -r, --restart                                                        restart L2G from the last state in case it was interrupted [default=False]
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
@@ -41,8 +41,8 @@ import module_lammps as lmp
 #  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
 #  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
 #  -pmax,    --maximim-pressure MAXIMUM_PRESSURE                        maximum pressure value [default=1]
-#  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, an optional argument [default=None]
-#  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, an optional argument [default=None]
+#  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
+#  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
 #  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=1]
 #  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1]
 #
@@ -74,8 +74,8 @@ parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, h
 parser.add_argument("-tmax", "--maximum-temperature", type=float, default=2, help="maximum temperature value [default=2]")
 parser.add_argument("-pmin", "--minimum-pressure", type=float, default=0.5, help="minimum pressure value [default=0.5]")
 parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="maximum pressure value [default=1]")
-parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, an optional argument [default=None]")
-parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, an optional argument [default=None]")
+parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
+parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=1]")
 parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1]")
 
@@ -209,7 +209,7 @@ def run_networks(pop, temp, press, node_input, n):
 def evaluate(pop, gen, n):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    #arguments: population size, option (0, 1, 2), initial temperature value (optional), initial pressure value (optional)
+    #arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
     temp, press = initialize_T_P(n, 1, vtemp, vpress) 
 
     # run LAMMPS with initial structure 
