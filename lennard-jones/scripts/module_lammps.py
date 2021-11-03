@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from numpy.random import randint
-import random
 
 import numpy as np
 import os,sys
@@ -10,10 +9,10 @@ import os,sys
 # LAMMPS parameters
 #################################################################################
 
-bounds = [[0.4, 2],  [0.5, 1]] # define range for temperature and pressure: t_min, t_max, p_min, p_max
 nve_steps = 1000
 npt_steps = 5000
 n_steps = 3 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+dump_freq = 1000
 
 #################################################################################
 # end of parameters
@@ -38,7 +37,7 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
     for p in range(n_pop):
         # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
         newdata = filedata.replace("velocity all create 1.0 87287 dist gaussian","velocity all create 1.0 "+str(randint(0, 99999999))+" dist gaussian")
-        newdata = newdata.replace("output.xyz","output/data-"+str(p)+".xyz")
+        newdata = newdata.replace("dump 1 all xyz 1000 output.xyz", "dump 1 all xyz "+str(dump_freq)+" output/data-"+str(p)+".xyz")
         newdata = newdata.replace("orderparameter_timeave.txt","output/scores-"+str(p)+".txt")
         newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/restart-"+str(p))
         newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[p])+" "+str(temp[p])+" "+str(temp[p])+" iso "+str(press[p])+" "+str(press[p])+" "+str(press[p]))
@@ -73,7 +72,7 @@ def best_lammps(temp, press, state, gen):
     # generate the LAMMPS input files for the best candidate in the population
     # velocity all create <temp> <seed> dist <gaussian> ... 0 < seed <= 8 digits 
     newdata = filedata.replace("velocity all create 1.0 87287 dist gaussian","velocity all create 1.0 "+str(randint(0, 99999999))+" dist gaussian")
-    newdata = newdata.replace("output.xyz","output/data-best.xyz")
+    newdata = newdata.replace("dump 1 all xyz 1000 output.xyz", "dump 1 all xyz "+str(dump_freq)+" output/data-best.xyz")
     newdata = newdata.replace("orderparameter_timeave.txt","output/scores-best.txt")
     newdata = newdata.replace("restart 6000 output/lj.restart","restart "+str(nve_steps+npt_steps)+" output/restart-best")
     newdata = newdata.replace("fix 2 all npt temp 1.0 1.0 1.0 iso 1.0 1.0 1.0","fix 2 all npt temp "+str(temp[0])+" "+str(temp[0])+" "+str(temp[0])+" iso "+str(press[0])+" "+str(press[0])+" "+str(press[0]))
@@ -106,32 +105,6 @@ def get_scores(gen, n, n_iter):
         f.close()
         scores.append(float(lines[2].split(' ')[1]))
     return scores
-
-
-# initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-def initialize_T_P(n, opt, vtemp=None, vpress=None):
-    if opt == 0:
-        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
-        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
-    elif opt == 1:
-        temp  = np.full(n, vtemp, dtype=float)
-        press = np.full(n, vpress, dtype=float)
-    elif opt == 2:
-        for p in range(n):
-            temp[p] = vtemp + random.gauss(0,0.01)
-            if temp[p] > bounds[0][1]:
-                temp[p] = bounds[0][1]
-            if temp[p] < bounds[0][0]:
-                temp[p] = bounds[0][0]
-            press[p] = vpress + random.gauss(0,0.01)
-            if press[p] > bounds[1][1]:
-                press[p] = bounds[1][1]
-            if press[p] < bounds[1][0]:
-                press[p] = bounds[1][0]
-    else:
-        print("Valid options: 0 (random), 1 (mutated from a given value), 2 (fixed values)")
-
-    return temp, press
 
 
 def delete_output_files(gen, n, n_iter):

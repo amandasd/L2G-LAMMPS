@@ -21,7 +21,10 @@ import module_lammps as lmp
 #################################################################################
 # usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
 #        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
-#        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] 
+#        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
+#        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
+#        [-pmax MAXIMUM_PRESSURE] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
+#        [-tf TEMPERATURE_FACTOR] [-pf PRESSURE_FACTOR]
 #
 # optional arguments:
 #  -h, --help                                                           show this help message and exit
@@ -34,6 +37,14 @@ import module_lammps as lmp
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
 #  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
+#  -tmin,    --minimum-temperature MINIMUM_TEMPERATURE                  minimum temperature value [default=0.5]
+#  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
+#  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
+#  -pmax,    --maximim-pressure MAXIMUM_PRESSURE                        maximum pressure value [default=1]
+#  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, an optional argument [default=None]
+#  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, an optional argument [default=None]
+#  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=1]
+#  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1]
 #
 # Example:
 #    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
@@ -57,6 +68,17 @@ parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [d
 
 # neural network parameters 
 parser.add_argument("-hid", "--number-of-hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
+
+# temperature and pressure parameters
+parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, help="minimum temperature value [default=0.5]")
+parser.add_argument("-tmax", "--maximum-temperature", type=float, default=2, help="maximum temperature value [default=2]")
+parser.add_argument("-pmin", "--minimum-pressure", type=float, default=0.5, help="minimum pressure value [default=0.5]")
+parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="maximum pressure value [default=1]")
+parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, an optional argument [default=None]")
+parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, an optional argument [default=None]")
+parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=1]")
+parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1]")
+
 args = parser.parse_args()
 
 # define genetic algorithm parameters
@@ -75,6 +97,13 @@ if n_best > n_pop:
 input_nodes  = 1
 hidden_nodes = args.number_of_hidden_nodes
 output_nodes = 2
+
+#define temperature and pressure parameters
+bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]] 
+vtemp = args.initial_temperature
+vpress = args.initial_pressure
+tf = args.temperature_factor
+pf = args.pressure_factor
 
 #################################################################################
 # end of parameters
@@ -106,6 +135,38 @@ def mutation(ind, mu, sigma, mut_rate):
 #TODO: do I need to check bounds?
 
 
+# initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
+def initialize_T_P(n, opt, vtemp=None, vpress=None):
+    if opt == 0:
+        temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
+        press = np.random.uniform(bounds[1][0], bounds[1][1], n)
+    elif opt == 1:
+        if vtemp == None or vpress == None:
+            print("usage: [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE]")
+            exit()
+        temp  = np.full(n, vtemp, dtype=float)
+        press = np.full(n, vpress, dtype=float)
+    elif opt == 2:
+        if vtemp == None or vpress == None:
+            print("usage: [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE]")
+            exit()
+        for p in range(n):
+            temp[p] = vtemp + random.gauss(0,0.01)
+            if temp[p] > bounds[0][1]:
+                temp[p] = bounds[0][1]
+            if temp[p] < bounds[0][0]:
+                temp[p] = bounds[0][0]
+            press[p] = vpress + random.gauss(0,0.01)
+            if press[p] > bounds[1][1]:
+                press[p] = bounds[1][1]
+            if press[p] < bounds[1][0]:
+                press[p] = bounds[1][0]
+    else:
+        print("Valid options: 0 (random), 1 (mutated from a given value), 2 (fixed values)")
+
+    return temp, press
+
+
 # run neural networks
 def run_networks(pop, temp, press, node_input, n):
 
@@ -129,17 +190,17 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_nodes):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
-        temp[p] += node_output[0]
-        if temp[p] > lmp.bounds[0][1]:
-            temp[p] = lmp.bounds[0][1]
-        if temp[p] < lmp.bounds[0][0]:
-            temp[p] = lmp.bounds[0][0]
+        temp[p] += node_output[0] * tf
+        if temp[p] > bounds[0][1]:
+            temp[p] = bounds[0][1]
+        if temp[p] < bounds[0][0]:
+            temp[p] = bounds[0][0]
         
-        press[p] += node_output[1]
-        if press[p] > lmp.bounds[1][1]:
-            press[p] = lmp.bounds[1][1]
-        if press[p] < lmp.bounds[1][0]:
-            press[p] = lmp.bounds[1][0]
+        press[p] += node_output[1] * pf
+        if press[p] > bounds[1][1]:
+            press[p] = bounds[1][1]
+        if press[p] < bounds[1][0]:
+            press[p] = bounds[1][0]
 
     return temp, press
 
@@ -148,7 +209,8 @@ def run_networks(pop, temp, press, node_input, n):
 def evaluate(pop, gen, n):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    temp, press = lmp.initialize_T_P(n, 1, 1, 0.7) 
+    #arguments: population size, option (0, 1, 2), initial temperature value (optional), initial pressure value (optional)
+    temp, press = initialize_T_P(n, 1, vtemp, vpress) 
 
     # run LAMMPS with initial structure 
     if gen <= n_gen:
@@ -188,9 +250,9 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
-    
+
     random.seed(datetime.now())
     
     # restart L2G from the last state in case it was interrupted
