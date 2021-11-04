@@ -21,7 +21,7 @@ import module_lammps as lmp
 # 2 - https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/
 #####################################################################################################
 # usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
-#        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ts TOURNAMENT_SIZE]    \
+#        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
 #        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
 #        [-pmax MAXIMUM_PRESSURE] [-opt OPT] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
@@ -34,6 +34,7 @@ import module_lammps as lmp
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
+#  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
 #  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=3]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
@@ -64,6 +65,7 @@ parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
+parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
 parser.add_argument("-ts", "--tournament-size", type=int, default=3, help="tournament size [default=3]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
 parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
@@ -85,12 +87,13 @@ parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="press
 args = parser.parse_args()
 
 # define genetic algorithm parameters
-n_gen    = args.number_of_generations
-n_pop    = args.population_size
-mut_rate = args.mutation_rate
-ts       = args.tournament_size
-n_best   = args.number_of_retained_solutions 
-elitism  = args.elitism
+n_gen     = args.number_of_generations
+n_pop     = args.population_size
+mut_rate  = args.mutation_rate
+mut_sigma = args.mutation_sigma
+ts        = args.tournament_size
+n_best    = args.number_of_retained_solutions 
+elitism   = args.elitism
 
 if mut_rate > 1 or mut_rate < 0:
     mut_rate = 1
@@ -251,7 +254,7 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
     random.seed(datetime.now())
@@ -306,7 +309,7 @@ if __name__ == '__main__':
                 continue
             ind = selected[i]
             # mutation: change weights and bias of neural networks
-            mutation(ind, 0, 0.01, mut_rate)
+            mutation(ind, 0, mut_sigma, mut_rate)
             # store for next generation
             new_pop.append(ind)
         # replace population
