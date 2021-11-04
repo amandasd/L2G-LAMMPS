@@ -15,6 +15,7 @@ import module_lammps as lmp
 #####################################################################################################
 # Learning to Grow algorithm for LAMMPS (L2G)
 # Solution is an array of real values that represents a neural network
+# Changes must be made to the module_lammps.py file according to your LAMMPS simulation
 # References
 # 1 - S. Whitelam, I. Tamblyn. "Learning to grow: control of materials self-assembly using
 #     evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604
