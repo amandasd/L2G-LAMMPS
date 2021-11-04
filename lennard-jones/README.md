@@ -1,6 +1,6 @@
 # Learning to Grow for LAMMPS
 
-Solution is an array of real values that represents a neural network
+Solution is an array of real values that represents a neural network\
 Changes must be made to the module\_lammps.py file according to your LAMMPS simulation
 
 ## Run on Cori GPU
