@@ -33,7 +33,7 @@ thermo_modify  format float %5.14g
 
 velocity      all create ${T} 4928459 rot yes dist gaussian
 fix           1 all nve
-timestep      0.002  #1fs
+timestep      0.001  #1fs
 run           1000 #1ps
 
 #---------------NPT production run----------------

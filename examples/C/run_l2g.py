@@ -59,6 +59,8 @@ output_layer = 2
 # Restart from previous run; restart.dat is required
 restart = False
 
+# Check evolution of P,T without MD runs
+check_l2g_protocols = False
 #################################################################################
 # end of parameters
 #################################################################################
@@ -300,11 +302,14 @@ def run_networks(pop, temp, press, node_input, n):
 
 # evaluate all candidates in the population
 
-def evaluate(pop, gen, n):
+def evaluate(pop, gen, n, **kwargs):
+    
+    if fake_run in kwargs.keys():
+        scores = check_l2g_protocols_no_lammps(pop, gen, n)
+        return scores
 
     #temp  = np.random.uniform(bounds[0][0], bounds[0][1], n)
     #press = np.random.uniform(bounds[1][0], bounds[1][1], n)
-    
     temp = np.repeat(np.array([t_start]), n)
     press = np.repeat(np.array([p_start]), n)
     
@@ -332,29 +337,13 @@ def evaluate(pop, gen, n):
             print("Running for Best candidate, Nstep %s" %(str(s)))
             best_lammps(temp, press, state, n_iter)
     
-    # TO DO:
-    # Improve below code to remove all restart files
+    
     # Remove unnecessary LAMMPS files
     state = n_steps*npt_steps+npt_steps+nve_steps
     os.system('rm output/data.restart-*')
-    '''    
-    for p in range(n):
-        if state > 0 and state > (nve_steps+npt_steps):
-            for i in np.arange(state-(npt_steps-nve_steps),state+nve_steps,nve_steps):
-                if gen < n_iter:
-                    os.system('rm output/data.restart-'+str(p)+"."+str(i))
-                else:
-                    os.system('rm output/data.restart-best.'+str(i))
-                        
-        elif state > 0:
-            if gen < n_iter:
-                os.system('rm output/data.restart-'+str(p)+"."+str(state))
-            else:
-                os.system('rm output/data.restart-best.'+str(state))
-    '''
 
     
-
+    # Final score evaluation using Lammps runs
     scores = []
     for p in range(n):
         if gen < n_iter:
@@ -382,7 +371,27 @@ def evaluate(pop, gen, n):
     return scores
 
 
+def check_l2g_protocols_no_lammps(pop, gen, n):
+    temp = np.repeat(np.array([t_start]), n)
+    press = np.repeat(np.array([p_start]), n)
+    print("Running for Gen %s, Using initial structure set-up" %str(gen))
+    for p in range(n_pop):
+        print('Gen: ', gen, '    Sample: ', p, '    State: ', 0, '    Temp: ', temp[p], '    Press: ', press[p], flush=True)
 
+    for s in range(n_steps):
+        node_input = s * 1./n_steps 
+        # run neural networks
+        temp, press = run_networks(pop, temp, press, node_input, n)
+        state = s*npt_steps+npt_steps+nve_steps
+        for p in range(n_pop):
+            print('Gen: ', gen, '    Sample: ', p, '    State: ', state, '    Temp: ', temp[p], '    Press: ', press[p], flush=True)
+
+    # Final score evaluation using Lammps runs
+    scores = []
+    for p in range(n):
+        scores.append(rand())
+        
+    return scores
 #################################################################################
 # end of functions
 #################################################################################
@@ -428,7 +437,8 @@ if __name__ == '__main__':
         # generate a random initial population: weights and bias of neural networks
         pop = [[random.gauss(0,1) for _ in range(hidden_layer+input_layer*hidden_layer+output_layer*hidden_layer)] for _ in range(n_pop)]
         # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, -1, n_pop)
+        #scores = evaluate(pop, -1, n_pop)
+        scores = evaluate(pop, -1, n_pop, fake_run=1) if check_l2g_protocols else evaluate(pop, -1, n_pop)
 
 
     #----------------------------------------------
@@ -468,24 +478,27 @@ if __name__ == '__main__':
         pop = children
 
         # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, gen, n_pop)
+        #scores = evaluate(pop, gen, n_pop)
+        scores = evaluate(pop, gen, n_pop, fake_run=1) if check_l2g_protocols else evaluate(pop, gen, n_pop)
 
         # select the best candidate
         idx = scores.index(max(scores))
-        if scores[idx] > best_eval:
-            best, best_eval = pop[idx], scores[idx]
+        best_current_gen = scores[idx]
+        if best_current_gen > best_eval:
+            best, best_eval = pop[idx], best_current_gen
             print(">%d, new best = %f" % (gen, best_eval))
             print()
 
         with open("dumpfile.dat","a") as outfile:
-            outfile.write("{} {} {}\n".format(gen,idx,best_eval))
+            outfile.write("{} {} {}\n".format(gen,idx,best_current_gen))
 
         with open("restart.dat","a") as outfile2:
             outfile2.write("{} | {}\n".format([p.tolist() for p in pop],scores))
 
     # evaluate the best candidate
     #scores = evaluate([pop[idx]], n_iter, 1)
-    scores = evaluate([best], n_iter, 1)
+    #scores = evaluate([best], n_iter, 1)
+    scores = evaluate([best], n_iter, 1, fake_run=1) if check_l2g_protocols else evaluate([best], n_iter, 1)
     print("best = %f" % (scores[0]))
 
     with open("dumpfile.dat","a") as outfile:
