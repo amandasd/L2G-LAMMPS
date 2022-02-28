@@ -47,8 +47,8 @@ import module_lammps as lmp
 #  -opt",    --initialize-T-P OPTION                                    valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required
 #  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
 #  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
-#  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=1]
-#  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1]
+#  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=10]
+#  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1000]
 #
 # Example:
 #    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
@@ -82,8 +82,8 @@ parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="
 parser.add_argument("-opt", "--initialize-T-P", type=int, choices=[0, 1, 2], default=0, help="valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required")
 parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
-parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=1]")
-parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1]")
+parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=10]")
+parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1000]")
 
 args = parser.parse_args()
 
@@ -172,9 +172,13 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
 
 
 # run neural networks
-def run_networks(pop, temp, press, node_input, n):
+def run_networks(pop, temp, press, node_input, n, gen):
 
     for p in range(n):
+
+        if int(node_input*lmp.n_steps) == 0:
+            with open("output/protocol-"+str(p),"a") as outfile:
+                outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
 
         # get weights and bias
         bias_hidden = pop[p][:hidden_nodes]
@@ -194,28 +198,38 @@ def run_networks(pop, temp, press, node_input, n):
         for k in range(output_nodes):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
-        temp[p] += node_output[0] * args.temperature_factor
+        node_output[0] = node_output[0] * args.temperature_factor
+        if np.abs(node_output[0]) > 15:
+            node_output[0] = node_output[0]/node_output[0] * 15.
+        temp[p] += node_output[0]
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
         if temp[p] < bounds[0][0]:
             temp[p] = bounds[0][0]
         
-        press[p] += node_output[1] * args.pressure_factor
+        node_output[1] = node_output[1] * args.pressure_factor
+        if np.abs(node_output[1]) > 10000:
+            node_output[1] = node_output[1]/node_output[1] * 10000.
+        press[p] += node_output[1]
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
         if press[p] < bounds[1][0]:
             press[p] = bounds[1][0]
 
+        with open("output/protocol-"+str(p),"a") as outfile:
+            outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
+
     return temp, press
 
 
 # evaluate all candidates in the population: run neural networks and LAMMPS
-def evaluate(pop, gen, n):
+def evaluate(pop, gen, n, temp, press):
 
     # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
     # options 1 and 2 require initial temperature and pressure values
     # arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
-    temp, press = initialize_T_P(n, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
+    # for options = 0, 1, 2, commented for constant T and P
+    #temp, press = initialize_T_P(n, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
 
     # run LAMMPS with initial structure 
     if gen <= n_gen:
@@ -228,7 +242,8 @@ def evaluate(pop, gen, n):
     for s in range(lmp.n_steps):
         node_input = s * 1./lmp.n_steps 
         # run neural networks
-        temp, press = run_networks(pop, temp, press, node_input, n)
+        # TODO: for constant T and P 
+        #temp, press = run_networks(pop, temp, press, node_input, n, gen)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
         # run LAMMPS with restart files
         if gen <= n_gen:
@@ -258,8 +273,16 @@ if __name__ == '__main__':
     print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
+    # delete previous files: restart.dat and dumpfile.dat
+    os.system('rm -f output/restart.dat')
+    os.system('rm -f output/dumpfile.dat')
+    os.system('rm -f output/protocol*')
+
     random.seed(datetime.now())
-    
+
+    # TODO: for constant T and P 
+    temp, press = initialize_T_P(n_pop, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
+
     # restart L2G from the last state in case it was interrupted
     if args.restart:
         value = -1000
@@ -274,7 +297,7 @@ if __name__ == '__main__':
         # generate a random initial population: weights and bias of neural networks
         pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
         # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, 0, n_pop)
+        scores = evaluate(pop, 0, n_pop, temp, press)
 
     # select the best candidate 
     idx = scores.index(max(scores))
@@ -283,10 +306,6 @@ if __name__ == '__main__':
     print(">0, new best = %f" % (best_score))
     print()
     
-    # delete previous files: restart.dat and dumpfile.dat
-    os.system('rm -f output/restart.dat')
-    os.system('rm -f output/dumpfile.dat')
-
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, best_score))
@@ -300,24 +319,38 @@ if __name__ == '__main__':
         # n_best candidates are selected to generate new candidates
         selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
         
+        #TODO: for constant T and P
+        if gen == 0:
+            for i in range(0, n_pop):
+                with open("output/protocol-"+str(i),"a") as outfile:
+                    outfile.write("gen {}, {}, {}\n".format(gen,temp[i],press[i]))
+
         # create the next generation
         new_pop = list()
         for i in range(0, n_pop):
+            ind = selected[i]
+            # mutation: change weights and bias of neural networks
+            mutation(ind, 0, mut_sigma, mut_rate)
+
+            #TODO: for constant T and P
+            temp[i]  = temp[i]  + ind[0]
+            press[i] = press[i] + ind[1]
+            with open("output/protocol-"+str(i),"a") as outfile:
+                outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
+
             #copy the best candidate to next generation without mutation
             if elitism:
                 new_pop.append(pop[idx])
                 elitism = False
                 continue
-            ind = selected[i]
-            # mutation: change weights and bias of neural networks
-            mutation(ind, 0, mut_sigma, mut_rate)
             # store for next generation
             new_pop.append(ind)
+
         # replace population
         pop = new_pop
     
         # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, gen+1, n_pop)
+        scores = evaluate(pop, gen+1, n_pop, temp, press)
     
         # save population and scores in order to restart L2G from the last state in case of being interrupted
         with open("output/restart.dat","a") as outfile2:
