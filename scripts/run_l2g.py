@@ -94,7 +94,6 @@ mut_rate  = args.mutation_rate
 mut_sigma = args.mutation_sigma
 ts        = args.tournament_size
 n_best    = args.number_of_retained_solutions 
-elitism   = args.elitism
 
 if mut_rate > 1 or mut_rate < 0:
     mut_rate = 1
@@ -311,6 +310,8 @@ if __name__ == '__main__':
         outfile1.write("{} {} {}\n".format(0, idx, best_score))
 
     for gen in range(n_gen): # maximum number of iterations
+
+        elitism = args.elitism
 
         # rank the scores 
         indices = [scores.index(x) for x in sorted(scores, reverse=True)]
