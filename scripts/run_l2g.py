@@ -47,8 +47,8 @@ import module_lammps as lmp
 #  -opt",    --initialize-T-P OPTION                                    valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required
 #  -vtemp,   --initial-temperature INITIAL_TEMPERATURE                  initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
 #  -vpress,  --initial-pressure INITIAL_PRESSURE                        initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]
-#  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=1]
-#  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1]
+#  -tf,      --temperature-factor TEMPERATURE_FACTOR                    temperature factor [default=10]
+#  -pf,      --pressure-factor PRESSURE_FACTOR                          pressure factor [default=1000]
 #
 # Example:
 #    python run_l2g.py -gpus 8 -gen 2 -pop 8 -mr 1 -ts 3 -best 3 -e -hid 10
@@ -82,8 +82,8 @@ parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="
 parser.add_argument("-opt", "--initialize-T-P", type=int, choices=[0, 1, 2], default=0, help="valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required")
 parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
-parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=1]")
-parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1]")
+parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=10]")
+parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1000]")
 
 args = parser.parse_args()
 
@@ -172,9 +172,13 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
 
 
 # run neural networks
-def run_networks(pop, temp, press, node_input, n):
+def run_networks(pop, temp, press, node_input, n, gen):
 
     for p in range(n):
+
+        if int(node_input*lmp.n_steps) == 0:
+            with open("output/protocol-"+str(p),"a") as outfile:
+                outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
 
         # get weights and bias
         bias_hidden = pop[p][:hidden_nodes]
@@ -206,6 +210,9 @@ def run_networks(pop, temp, press, node_input, n):
         if press[p] < bounds[1][0]:
             press[p] = bounds[1][0]
 
+        with open("output/protocol-"+str(p),"a") as outfile:
+            outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
+
     return temp, press
 
 
@@ -228,7 +235,7 @@ def evaluate(pop, gen, n):
     for s in range(lmp.n_steps):
         node_input = s * 1./lmp.n_steps 
         # run neural networks
-        temp, press = run_networks(pop, temp, press, node_input, n)
+        temp, press = run_networks(pop, temp, press, node_input, n, gen)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
         # run LAMMPS with restart files
         if gen <= n_gen:
@@ -258,6 +265,11 @@ if __name__ == '__main__':
     print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
+    # delete previous files: restart.dat and dumpfile.dat
+    os.system('rm -f output/restart.dat')
+    os.system('rm -f output/dumpfile.dat')
+    os.system('rm -f output/protocol*')
+
     random.seed(datetime.now())
     
     # restart L2G from the last state in case it was interrupted
@@ -283,10 +295,6 @@ if __name__ == '__main__':
     print(">0, new best = %f" % (best_score))
     print()
     
-    # delete previous files: restart.dat and dumpfile.dat
-    os.system('rm -f output/restart.dat')
-    os.system('rm -f output/dumpfile.dat')
-
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, best_score))
