@@ -10,6 +10,8 @@ import numpy as np
 import os,sys
 import argparse
 
+import time
+
 import module_lammps as lmp
 
 #####################################################################################################
@@ -124,7 +126,7 @@ def selection(pop, scores, k=ts):
         # check if better (e.g. perform a tournament)
         if scores[ix] > scores[selection_ix]:
     	    selection_ix = ix
-    return pop[selection_ix]
+    return pop[selection_ix], selection_ix
 
 
 # mutation operator
@@ -233,7 +235,10 @@ def evaluate(pop, gen, n, temp, press):
     # run LAMMPS with initial structure 
     if gen <= n_gen:
         print("[gen %s] running LAMMPS with initial structure" %str(gen))
+        start = time.perf_counter()
         lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus) 
+        end = time.perf_counter()
+        #print(end-start)
     else:
         print("running LAMMPS with initial structure for best solution")
         lmp.best_lammps(temp, press, 0, gen)
@@ -247,7 +252,10 @@ def evaluate(pop, gen, n, temp, press):
         # run LAMMPS with restart files
         if gen <= n_gen:
             print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
+            start = time.perf_counter()
             lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus) 
+            end = time.perf_counter()
+            #print(end-start)
         else:
             print("[step %s] running LAMMPS with restart file for best solution" %(str(s)))
             lmp.best_lammps(temp, press, state, gen)
@@ -318,7 +326,12 @@ if __name__ == '__main__':
     
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
-        selected = [selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best]) for _ in range(n_pop)]
+        #selected = [[selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])] for _ in range(n_pop)]
+        selected = []; selected_idx = []
+        for i in range(0, n_pop):
+            pair = selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])
+            selected.append(pair[0])
+            selected_idx.append(indices[pair[1]])
         
         #TODO: for constant T and P
         if gen == 0:
@@ -334,14 +347,16 @@ if __name__ == '__main__':
             mutation(ind, 0, mut_sigma, mut_rate)
 
             #TODO: for constant T and P
-            temp[i]  = temp[i]  + ind[0]
-            press[i] = press[i] + ind[1]
+            temp[i]  = temp[selected_idx[i]]  + ind[0]
+            press[i] = press[selected_idx[i]] + ind[1]
             with open("output/protocol-"+str(i),"a") as outfile:
                 outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
 
             #copy the best candidate to next generation without mutation
             if elitism:
                 new_pop.append(pop[idx])
+                temp[i] = temp[idx]
+                press[i] = press[idx]
                 elitism = False
                 continue
             # store for next generation
