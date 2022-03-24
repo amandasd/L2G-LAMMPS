@@ -85,7 +85,7 @@ def get_scores(gen, n, n_iter):
     scores = []
     for p in range(n):
         if gen <= n_iter:
-            filein = "output/out-"+str(gen)+"."+str(p)
+            filein = "output/out-"+str(gen)+"-"+str(p)+".10"
         else:
             filein = "output/scores-best.txt"
         f = open(filein,'r')

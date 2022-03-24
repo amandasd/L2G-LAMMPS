@@ -201,7 +201,7 @@ def run_networks(pop, temp, press, node_input, n, gen):
 
         node_output[0] = node_output[0] * args.temperature_factor
         if np.abs(node_output[0]) > 15:
-            node_output[0] = node_output[0]/node_output[0] * 15.
+            node_output[0] = 15.
         temp[p] += node_output[0]
         if temp[p] > bounds[0][1]:
             temp[p] = bounds[0][1]
@@ -210,7 +210,7 @@ def run_networks(pop, temp, press, node_input, n, gen):
         
         node_output[1] = node_output[1] * args.pressure_factor
         if np.abs(node_output[1]) > 10000:
-            node_output[1] = node_output[1]/node_output[1] * 10000.
+            node_output[1] = 10000.
         press[p] += node_output[1]
         if press[p] > bounds[1][1]:
             press[p] = bounds[1][1]
@@ -347,8 +347,16 @@ if __name__ == '__main__':
             mutation(ind, 0, mut_sigma, mut_rate)
 
             #TODO: for constant T and P
+            ind[0] = ind[0] * args.temperature_factor
+            if np.abs(ind[0]) > 15: 
+                ind[0] = 15. 
             temp[i]  = temp[selected_idx[i]]  + ind[0]
+
+            ind[1] = ind[1] * args.pressure_factor
+            if np.abs(ind[1]) > 10000:
+                ind[1] = 10000.
             press[i] = press[selected_idx[i]] + ind[1]
+
             with open("output/protocol-"+str(i),"a") as outfile:
                 outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
 

@@ -20,7 +20,7 @@ while [ $p -lt $npop ]; do
 	 if [ $opt -eq 1 ]; then
             $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.best > $OUTPUT_DIR/out.best &
          elif [ $opt -eq 0 ]; then
-            $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.$p > $OUTPUT_DIR/out-$gen.$p &
+            $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.$p > $OUTPUT_DIR/out-$gen-$p.$step &
             #strace -c -o $OUTPUT_DIR/strace-$gen-$p.$step $LAMMPS_DIR/lmp -pk gpu $ngpus gpuID $g -sf gpu -in $HOME/input/in.$p > $OUTPUT_DIR/out-$gen.$p &
          fi
       fi
