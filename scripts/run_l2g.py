@@ -312,7 +312,7 @@ if __name__ == '__main__':
     print()
     print(">0, new best = %f" % (best_score))
     print()
-    
+
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, best_score))
@@ -323,7 +323,7 @@ if __name__ == '__main__':
 
         # rank the scores 
         indices = [scores.index(x) for x in sorted(scores, reverse=True)]
-    
+
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
         #selected = [[selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])] for _ in range(n_pop)]
@@ -332,7 +332,7 @@ if __name__ == '__main__':
             pair = selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])
             selected.append(pair[0])
             selected_idx.append(indices[pair[1]])
-        
+
         #TODO: for constant T and P
         if gen == 0:
             for i in range(0, n_pop):
@@ -342,23 +342,6 @@ if __name__ == '__main__':
         # create the next generation
         new_pop = list()
         for i in range(0, n_pop):
-            ind = selected[i]
-            # mutation: change weights and bias of neural networks
-            mutation(ind, 0, mut_sigma, mut_rate)
-
-            #TODO: for constant T and P
-            ind[0] = ind[0] * args.temperature_factor
-            if np.abs(ind[0]) > 15: 
-                ind[0] = 15. 
-            temp[i]  = temp[selected_idx[i]]  + ind[0]
-
-            ind[1] = ind[1] * args.pressure_factor
-            if np.abs(ind[1]) > 10000:
-                ind[1] = 10000.
-            press[i] = press[selected_idx[i]] + ind[1]
-
-            with open("output/protocol-"+str(i),"a") as outfile:
-                outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
 
             #copy the best candidate to next generation without mutation
             if elitism:
@@ -366,20 +349,49 @@ if __name__ == '__main__':
                 temp[i] = temp[idx]
                 press[i] = press[idx]
                 elitism = False
+                with open("output/protocol-"+str(i),"a") as outfile:
+                    outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
                 continue
-            # store for next generation
+
+            ind = selected[i]
+            # mutation: change weights and bias of neural networks
+            mutation(ind, 0, mut_sigma, mut_rate)
+
+            #TODO: for constant T and P
+            #if np.abs(ind[0] * args.temperature_factor) > 15:
+            #    temp[i] = temp[selected_idx[i]] + 15. * random.choice([1,-1])
+            #else:
+            temp[i] = temp[selected_idx[i]] + ind[0] * args.temperature_factor * random.choice([1,-1])
+            if temp[i] > bounds[0][1]:
+                temp[i] = bounds[0][1]
+            if temp[i] < bounds[0][0]:
+                temp[i] = bounds[0][0]
+
+            #if np.abs(ind[1] * args.pressure_factor) > 10000:
+            #    press[i] = press[selected_idx[i]] + 10000. * random.choice([1,-1])
+            #else:
+            press[i] = press[selected_idx[i]] + ind[1] * args.pressure_factor * random.choice([1,-1])
+            if press[i] > bounds[1][1]:
+                press[i] = bounds[1][1]
+            if press[i] < bounds[1][0]:
+                press[i] = bounds[1][0]
+
+            with open("output/protocol-"+str(i),"a") as outfile:
+                outfile.write("gen {}, {}, {}\n".format(gen+1,temp[i],press[i]))
+
+           # store for next generation
             new_pop.append(ind)
 
         # replace population
         pop = new_pop
-    
+
         # evaluate all candidates in the population: run neural networks and LAMMPS
         scores = evaluate(pop, gen+1, n_pop, temp, press)
-    
+
         # save population and scores in order to restart L2G from the last state in case of being interrupted
         with open("output/restart.dat","a") as outfile2:
             outfile2.write("{} | {}\n".format(pop,scores))
-    
+
         # select the best candidate
         idx = scores.index(max(scores))
         if scores[idx] > best_score:
@@ -387,11 +399,11 @@ if __name__ == '__main__':
             print()
             print(">%d, new best = %f" % (gen+1, best_score))
             print()
-    
+
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
             outfile1.write("{} {} {}\n".format(gen+1, idx, best_score))
-    
+
     # evaluate the best candidate
     #scores = evaluate([pop[idx]], n_gen+1, 1)
     #print("best = %f" % (scores[0]))
