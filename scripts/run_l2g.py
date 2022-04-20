@@ -38,7 +38,7 @@ import module_lammps as lmp
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
-#  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=3]
+#  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=1]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
 #  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
@@ -69,7 +69,7 @@ parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
-parser.add_argument("-ts", "--tournament-size", type=int, default=3, help="tournament size [default=3]")
+parser.add_argument("-ts", "--tournament-size", type=int, default=1, help="tournament size [default=1]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
 parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
 
@@ -127,7 +127,6 @@ def selection(pop, scores, k=ts):
         if scores[ix] > scores[selection_ix]:
     	    selection_ix = ix
     return pop[selection_ix], selection_ix
-
 
 # mutation operator
 def mutation(ind, mu, sigma, mut_rate):
@@ -306,7 +305,7 @@ if __name__ == '__main__':
         # evaluate all candidates in the population: run neural networks and LAMMPS
         scores = evaluate(pop, 0, n_pop, temp, press)
 
-    # select the best candidate 
+    # select the best candidate
     idx = scores.index(max(scores))
     best_ind, best_score = pop[idx], scores[idx]
     print()
@@ -321,17 +320,21 @@ if __name__ == '__main__':
 
         elitism = args.elitism
 
-        # rank the scores 
+        # rank the scores
         indices = [scores.index(x) for x in sorted(scores, reverse=True)]
 
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
         #selected = [[selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])] for _ in range(n_pop)]
-        selected = []; selected_idx = []
-        for i in range(0, n_pop):
-            pair = selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])
-            selected.append(pair[0])
-            selected_idx.append(indices[pair[1]])
+
+        selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop))])
+        selected = list(np.array(pop)[np.array(selected_idx)])
+
+        #selected = []; selected_idx = []
+        #for i in range(0, n_pop):
+        #    pair = selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])
+        #    selected.append(pair[0])
+        #    selected_idx.append(indices[pair[1]])
 
         #TODO: for constant T and P
         if gen == 0:

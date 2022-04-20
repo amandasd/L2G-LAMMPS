@@ -8,15 +8,15 @@
 #SBATCH -n 40
 #SBATCH -c 2
 #SBATCH --switches=1
-#SBATCH --exclusive     
+#SBATCH --exclusive
 #SBATCH -J learningToGrow
 #SBATCH --output=l2g.out
 
 HOME="$(pwd)"
 
-module purge 
+module purge
 module load cgpu
-module load cmake 
+module load cmake
 module load PrgEnv-llvm/12.0.0-git_20210117
 module load python/3.8-anaconda-2020.11
 

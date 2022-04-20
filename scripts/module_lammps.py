@@ -36,7 +36,10 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
         newdata = filedata.replace("variable                T equal 375","variable                T equal {}".format(temp[p]))
         newdata = newdata.replace("variable                P equal 150000","variable                P equal {}".format(press[p]))
         newdata = newdata.replace("variable                npt_steps equal 10000","variable                npt_steps equal {}".format(npt_steps))
-        newdata = newdata.replace("dump            1 all custom 10000 He.dump id type x y z c_CNA","dump            1 all custom {} output/He-{}.dump id type x y z c_CNA".format(dump_freq,p))
+        # 0 < seed <= 8 digits
+        newdata = newdata.replace("variable                seed equal 1","variable                seed equal {}".format(randint(0, 99999999)))
+        newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[2]","dump            1 all custom {} output/He-{}.xyz id type x y z c_qlwlhat[2]".format(dump_freq,p))
+        #newdata = newdata.replace("dump            1 all xyz 10000 output/He.xyz","dump            1 all xyz {} output/He-{}.xyz".format(dump_freq,p))
         newdata = newdata.replace("restart         ${npt_steps} He.restart","restart         {} output/He-{}.restart".format(npt_steps,p))
 
         if state > 0:
@@ -85,7 +88,7 @@ def get_scores(gen, n, n_iter):
     scores = []
     for p in range(n):
         if gen <= n_iter:
-            filein = "output/out-"+str(gen)+"-"+str(p)+".10"
+            filein = "output/out-"+str(gen)+"-"+str(p)+"."+str(n_steps)
         else:
             filein = "output/scores-best.txt"
         f = open(filein,'r')
