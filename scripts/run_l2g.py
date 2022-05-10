@@ -36,7 +36,6 @@ import module_lammps as lmp
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
-#  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=3]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
 #  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
@@ -67,7 +66,6 @@ parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
-parser.add_argument("-ts", "--tournament-size", type=int, default=3, help="tournament size [default=3]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
 parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
 
@@ -92,7 +90,6 @@ n_gen     = args.number_of_generations
 n_pop     = args.population_size
 mut_rate  = args.mutation_rate
 mut_sigma = args.mutation_sigma
-ts        = args.tournament_size
 n_best    = args.number_of_retained_solutions
 
 if mut_rate > 1 or mut_rate < 0:
@@ -115,17 +112,6 @@ bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pr
 #################################################################################
 # functions
 #################################################################################
-
-# tournament selection
-def selection(pop, scores, k=ts):
-    # first random selection
-    selection_ix = randint(len(pop))
-    for ix in randint(0, len(pop), k-1):
-        # check if better (e.g. perform a tournament)
-        if scores[ix] > scores[selection_ix]:
-    	    selection_ix = ix
-    return pop[selection_ix]
-
 
 # mutation operator
 def mutation(ind, mu, sigma, mut_rate):
@@ -197,10 +183,13 @@ def run_networks(pop, temp, press, node_input, n, gen):
         for k in range(output_nodes):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
-        press[p] += node_output[1] * args.pressure_factor * random.choice([1,-1])
-        temp[p]  += node_output[0] * args.temperature_factor * random.choice([1,-1])
+        temp[p] += node_output[0] * args.temperature_factor * random.choice([1,-1])
         if temp[p] < 0:
             temp[p] = 0
+
+        press[p] += node_output[1] * args.pressure_factor * random.choice([1,-1])
+        if press[p] < 0:
+            press[p] = 0
 
         with open("output/protocol-"+str(p),"a") as outfile:
             outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
@@ -254,7 +243,7 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
     # delete previous files: restart.dat and dumpfile.dat
