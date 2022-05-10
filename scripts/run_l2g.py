@@ -4,7 +4,7 @@ from numpy.random import randint
 from numpy.random import rand
 import random
 
-from datetime import datetime 
+from datetime import datetime
 
 import numpy as np
 import os,sys
@@ -23,7 +23,7 @@ import module_lammps as lmp
 #     evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604
 # 2 - https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/
 #####################################################################################################
-# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
+# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \
 #        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
 #        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
@@ -38,10 +38,8 @@ import module_lammps as lmp
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
-#  -ts,      --tournament-size TOURNAMENT_SIZE                          tournament size [default=1]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
-#  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
 #  -tmin,    --minimum-temperature MINIMUM_TEMPERATURE                  minimum temperature value [default=0.5]
 #  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
 #  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
@@ -69,12 +67,8 @@ parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
-parser.add_argument("-ts", "--tournament-size", type=int, default=1, help="tournament size [default=1]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
 parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
-
-# neural network parameters 
-parser.add_argument("-hid", "--number-of-hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
 
 # temperature and pressure parameters
 parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, help="minimum temperature value [default=0.5]")
@@ -94,18 +88,12 @@ n_gen     = args.number_of_generations
 n_pop     = args.population_size
 mut_rate  = args.mutation_rate
 mut_sigma = args.mutation_sigma
-ts        = args.tournament_size
-n_best    = args.number_of_retained_solutions 
+n_best    = args.number_of_retained_solutions
 
 if mut_rate > 1 or mut_rate < 0:
     mut_rate = 1
 if n_best > n_pop:
     n_best = int(np.ceil(n_pop * 0.1))
-
-# define neural network parameters 
-input_nodes  = 1
-hidden_nodes = args.number_of_hidden_nodes
-output_nodes = 2
 
 #define temperature and pressure parameters
 bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]] 
@@ -117,16 +105,6 @@ bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pr
 #################################################################################
 # functions
 #################################################################################
-
-# tournament selection
-def selection(pop, scores, k=ts):
-    # first random selection
-    selection_ix = randint(len(pop))
-    for ix in randint(0, len(pop), k-1):
-        # check if better (e.g. perform a tournament)
-        if scores[ix] > scores[selection_ix]:
-    	    selection_ix = ix
-    return pop[selection_ix], selection_ix
 
 # mutation operator
 def mutation(ind, mu, sigma, mut_rate):
@@ -171,71 +149,14 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
     return temp, press
 
 
-# run neural networks
-def run_networks(pop, temp, press, node_input, n, gen):
-
-    for p in range(n):
-
-        if int(node_input*lmp.n_steps) == 0:
-            with open("output/protocol-"+str(p),"a") as outfile:
-                outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
-
-        # get weights and bias
-        bias_hidden = pop[p][:hidden_nodes]
-        weight_ih = pop[p][hidden_nodes:hidden_nodes+input_nodes*hidden_nodes]
-        weight_ih = np.reshape(weight_ih,(input_nodes,hidden_nodes))
-        weight_ho = pop[p][hidden_nodes+input_nodes*hidden_nodes:hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes]
-        weight_ho = np.reshape(weight_ho,(hidden_nodes,output_nodes))
- 
-        # calculate Sj 
-        node_hidden = np.zeros(shape=(hidden_nodes), dtype=float)
-        for j in range(hidden_nodes):
-            node_hidden[j] = np.sum(np.dot(node_input,weight_ih[:,j]))
-        node_hidden = np.tanh(np.add(node_hidden,bias_hidden))
-        
-        # calculate Sk 
-        node_output = np.zeros(shape=(output_nodes), dtype=float)
-        for k in range(output_nodes):
-            node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
-
-        node_output[0] = node_output[0] * args.temperature_factor
-        if np.abs(node_output[0]) > 15:
-            node_output[0] = 15.
-        temp[p] += node_output[0]
-        if temp[p] > bounds[0][1]:
-            temp[p] = bounds[0][1]
-        if temp[p] < bounds[0][0]:
-            temp[p] = bounds[0][0]
-        
-        node_output[1] = node_output[1] * args.pressure_factor
-        if np.abs(node_output[1]) > 10000:
-            node_output[1] = 10000.
-        press[p] += node_output[1]
-        if press[p] > bounds[1][1]:
-            press[p] = bounds[1][1]
-        if press[p] < bounds[1][0]:
-            press[p] = bounds[1][0]
-
-        with open("output/protocol-"+str(p),"a") as outfile:
-            outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
-
-    return temp, press
-
-
 # evaluate all candidates in the population: run neural networks and LAMMPS
 def evaluate(pop, gen, n, temp, press):
 
-    # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
-    # options 1 and 2 require initial temperature and pressure values
-    # arguments: population size, option (0, 1, 2), initial temperature value, initial pressure value
-    # for options = 0, 1, 2, commented for constant T and P
-    #temp, press = initialize_T_P(n, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
-
-    # run LAMMPS with initial structure 
+    # run LAMMPS with initial structure
     if gen <= n_gen:
         print("[gen %s] running LAMMPS with initial structure" %str(gen))
         start = time.perf_counter()
-        lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus) 
+        lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus)
         end = time.perf_counter()
         #print(end-start)
     else:
@@ -243,16 +164,12 @@ def evaluate(pop, gen, n, temp, press):
         lmp.best_lammps(temp, press, 0, gen)
 
     for s in range(lmp.n_steps):
-        node_input = s * 1./lmp.n_steps 
-        # run neural networks
-        # TODO: for constant T and P 
-        #temp, press = run_networks(pop, temp, press, node_input, n, gen)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
         # run LAMMPS with restart files
         if gen <= n_gen:
             print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
             start = time.perf_counter()
-            lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus) 
+            lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus)
             end = time.perf_counter()
             #print(end-start)
         else:
@@ -261,7 +178,7 @@ def evaluate(pop, gen, n, temp, press):
 
     # calculate scores
     scores = lmp.get_scores(gen, n, n_gen)
-    
+
     lmp.delete_output_files(gen, n, n_gen)
 
     return scores
@@ -276,7 +193,7 @@ def evaluate(pop, gen, n, temp, press):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -ts "+str(ts)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
     # delete previous files: restart.dat and dumpfile.dat
@@ -286,23 +203,22 @@ if __name__ == '__main__':
 
     random.seed(datetime.now())
 
-    # TODO: for constant T and P 
-    temp, press = initialize_T_P(n_pop, args.initialize_T_P, args.initial_temperature, args.initial_pressure) 
+    temp, press = initialize_T_P(n_pop, args.initialize_T_P, args.initial_temperature, args.initial_pressure)
 
     # restart L2G from the last state in case it was interrupted
     if args.restart:
         value = -1000
         lines = open("output/restart.dat","r").readlines()
         for line_idx, data in enumerate(lines):
-            gen_scores = eval(data.split("|")[1])    
+            gen_scores = eval(data.split("|")[1])
             if max(gen_scores) > value:
                 pop = eval(data.split("|")[0])
                 scores = eval(data.split("|")[1])
                 value = max(gen_scores)
     else:
-        # generate a random initial population: weights and bias of neural networks
-        pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
-        # evaluate all candidates in the population: run neural networks and LAMMPS
+        # generate a random initial population
+        pop = [[random.gauss(0,1) for _ in range(2)] for _ in range(n_pop)]
+        # evaluate all candidates in the population: run LAMMPS
         scores = evaluate(pop, 0, n_pop, temp, press)
 
     # select the best candidate
@@ -323,20 +239,9 @@ if __name__ == '__main__':
         # rank the scores
         indices = [scores.index(x) for x in sorted(scores, reverse=True)]
 
-        # select parents from the current population
-        # n_best candidates are selected to generate new candidates
-        #selected = [[selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])] for _ in range(n_pop)]
-
         selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop))])
         selected = list(np.array(pop)[np.array(selected_idx)])
 
-        #selected = []; selected_idx = []
-        #for i in range(0, n_pop):
-        #    pair = selection(np.take(pop,indices,0)[:n_best], np.take(scores,indices,0)[:n_best])
-        #    selected.append(pair[0])
-        #    selected_idx.append(indices[pair[1]])
-
-        #TODO: for constant T and P
         if gen == 0:
             for i in range(0, n_pop):
                 with open("output/protocol-"+str(i),"a") as outfile:
@@ -357,22 +262,14 @@ if __name__ == '__main__':
                 continue
 
             ind = selected[i]
-            # mutation: change weights and bias of neural networks
             mutation(ind, 0, mut_sigma, mut_rate)
 
-            #TODO: for constant T and P
-            #if np.abs(ind[0] * args.temperature_factor) > 15:
-            #    temp[i] = temp[selected_idx[i]] + 15. * random.choice([1,-1])
-            #else:
             temp[i] = temp[selected_idx[i]] + ind[0] * args.temperature_factor * random.choice([1,-1])
             if temp[i] > bounds[0][1]:
                 temp[i] = bounds[0][1]
             if temp[i] < bounds[0][0]:
                 temp[i] = bounds[0][0]
 
-            #if np.abs(ind[1] * args.pressure_factor) > 10000:
-            #    press[i] = press[selected_idx[i]] + 10000. * random.choice([1,-1])
-            #else:
             press[i] = press[selected_idx[i]] + ind[1] * args.pressure_factor * random.choice([1,-1])
             if press[i] > bounds[1][1]:
                 press[i] = bounds[1][1]
