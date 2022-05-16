@@ -2,7 +2,7 @@
 #SBATCH -A nstaff
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 02:30:00
+#SBATCH -t 02:00:00
 #SBATCH --nodes 1
 #SBATCH -G 8
 #SBATCH -n 40
@@ -25,5 +25,5 @@ export OMP_NUM_THREADS=1
 
 date
 #T and P -> high score
-python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -gen 8 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 200 -vpress 355467 -tf 10 -pf 15000 -ms 0.01 -hid 1000
+python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -gen 8 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 200 -vpress 355467 -tf 100 -pf 150000 -ms 0.3 -hid 1000
 date

@@ -34,6 +34,7 @@ import module_lammps as lmp
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
+#  -popf,    --population-factor PRESSURE_FACTOR                        population factor [default=2]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
@@ -64,6 +65,7 @@ parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L
 # genetic algorithm parameters
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
+parser.add_argument("-popf", "--population-factor", type=int, default=2, help="population factor [default=2]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
@@ -80,8 +82,8 @@ parser.add_argument("-pmax", "--maximum-pressure", type=float, default=1, help="
 parser.add_argument("-opt", "--initialize-T-P", type=int, choices=[0, 1, 2], default=0, help="valid options to initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value) [default=0]. For options 1 and 2, -vtemp and -vpress are required")
 parser.add_argument("-vtemp", "--initial-temperature", type=float, default=None, help="initial temperature value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
 parser.add_argument("-vpress", "--initial-pressure", type=float, default=None, help="initial pressure value, a required argument for options 1 and 2 of initialize_T_P() function [default=None]")
-parser.add_argument("-tf", "--temperature-factor", type=int, default=1, help="temperature factor [default=10]")
-parser.add_argument("-pf", "--pressure-factor", type=int, default=1, help="pressure factor [default=1000]")
+parser.add_argument("-tf", "--temperature-factor", type=int, default=10, help="temperature factor [default=10]")
+parser.add_argument("-pf", "--pressure-factor", type=int, default=1000, help="pressure factor [default=1000]")
 
 args = parser.parse_args()
 
@@ -183,16 +185,16 @@ def run_networks(pop, temp, press, node_input, n, gen):
         for k in range(output_nodes):
             node_output[k] = np.sum(np.dot(node_hidden,weight_ho[:,k]))/(1.*hidden_nodes)
 
-        temp[p] += node_output[0] * args.temperature_factor * random.choice([1,-1])
+        temp[p] += node_output[0] * args.temperature_factor
         if temp[p] < 0:
             temp[p] = 0
 
-        press[p] += node_output[1] * args.pressure_factor * random.choice([1,-1])
+        press[p] += node_output[1] * args.pressure_factor
         if press[p] < 0:
             press[p] = 0
 
         with open("output/protocol-"+str(p),"a") as outfile:
-            outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
+            outfile.write("gen {}, step {}, {}, {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p],node_output[0],node_output[1]))
 
     return temp, press
 
@@ -208,7 +210,7 @@ def evaluate(pop, gen, n):
     # run LAMMPS with initial structure
     if gen <= n_gen:
         print("[gen %s] running LAMMPS with initial structure" %str(gen))
-        lmp.run_lammps(temp, press, 0, gen, n_pop, args.number_of_gpus)
+        lmp.run_lammps(temp, press, 0, gen, n, args.number_of_gpus)
     else:
         print("running LAMMPS with initial structure for best solution")
         lmp.best_lammps(temp, press, 0, gen)
@@ -221,7 +223,7 @@ def evaluate(pop, gen, n):
         # run LAMMPS with restart files
         if gen <= n_gen:
             print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
-            lmp.run_lammps(temp, press, state, gen, n_pop, args.number_of_gpus)
+            lmp.run_lammps(temp, press, state, gen, n, args.number_of_gpus)
         else:
             print("[step %s] running LAMMPS with restart file for best solution" %(str(s)))
             lmp.best_lammps(temp, press, state, gen)
@@ -243,7 +245,7 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -popf "+str(args.population_factor)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
     # delete previous files: restart.dat and dumpfile.dat
@@ -265,9 +267,9 @@ if __name__ == '__main__':
                 value = max(gen_scores)
     else:
         # generate a random initial population: weights and bias of neural networks
-        pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop)]
+        pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*args.population_factor)]
         # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, 0, n_pop)
+        scores = evaluate(pop, 0, n_pop*args.population_factor)
 
     # select the best candidate
     idx = scores.index(max(scores))
@@ -278,7 +280,7 @@ if __name__ == '__main__':
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
-        outfile1.write("{} {} {}\n".format(0, idx, best_score))
+        outfile1.write("{} {} {}\n".format(0, idx, scores[idx]))
 
     for gen in range(n_gen): # maximum number of iterations
 
@@ -289,7 +291,10 @@ if __name__ == '__main__':
 
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
-        selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop))])
+        if gen == 0:
+            selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop*args.population_factor))])
+        else:
+            selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop))])
         selected = list(np.array(pop)[np.array(selected_idx)])
 
         # create the next generation
@@ -325,7 +330,7 @@ if __name__ == '__main__':
 
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
-            outfile1.write("{} {} {}\n".format(gen+1, idx, best_score))
+            outfile1.write("{} {} {}\n".format(gen+1, idx, scores[idx]))
 
     # evaluate the best candidate
     #scores = evaluate([pop[idx]], n_gen+1, 1)
