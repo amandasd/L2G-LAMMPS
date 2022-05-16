@@ -24,7 +24,7 @@ export LAMMPS_DIR=$HOME
 export OMP_NUM_THREADS=1
 
 date
-python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -gen 8 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 0 -tf 10 -pf 15000 -ms 0.5 -best 8
+python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -gen 8 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 0 -tf 10 -pf 15000 -ms 0.5 -best 8
 #python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -gen 30 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 375 -vpress 150000 -tf 10 -pf 15000 -ms 0.5
 date
 
