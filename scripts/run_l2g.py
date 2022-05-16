@@ -16,7 +16,7 @@ import module_lammps as lmp
 
 #####################################################################################################
 # Learning to Grow algorithm for LAMMPS (L2G)
-# Solution is an array of real values that represents a neural network
+# Solution is an array of two real values that represents temperature and pressure values
 # Changes must be made to the module_lammps.py file according to your LAMMPS simulation
 # References
 # 1 - S. Whitelam, I. Tamblyn. "Learning to grow: control of materials self-assembly using
@@ -24,7 +24,7 @@ import module_lammps as lmp
 # 2 - https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/
 #####################################################################################################
 # usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \
-#        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
+#        [-pop POPULATION_SIZE] [-popf POPULATION_FACTOR] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
 #        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
 #        [-pmax MAXIMUM_PRESSURE] [-opt OPT] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
@@ -207,28 +207,17 @@ if __name__ == '__main__':
 
     temp, press = initialize_T_P(n_pop, args.initialize_T_P, args.initial_temperature, args.initial_pressure)
 
-    # restart L2G from the last state in case it was interrupted
-    if args.restart:
-        value = -1000
-        lines = open("output/restart.dat","r").readlines()
-        for line_idx, data in enumerate(lines):
-            gen_scores = eval(data.split("|")[1])
-            if max(gen_scores) > value:
-                pop = eval(data.split("|")[0])
-                scores = eval(data.split("|")[1])
-                value = max(gen_scores)
-    else:
-        # generate a random initial population
-        pop = [[random.gauss(0,1) for _ in range(2)] for _ in range(n_pop*args.population_factor)]
-        # evaluate all candidates in the population: run LAMMPS
-        scores = evaluate(pop, 0, n_pop*args.population_factor, temp, press)
+    # generate a random initial population
+    pop = [[random.gauss(0,1) for _ in range(2)] for _ in range(n_pop*args.population_factor)]
+    # evaluate all candidates in the population: run LAMMPS
+    scores = evaluate(pop, 0, n_pop*args.population_factor, temp, press)
 
     # select the best candidate
     idx = scores.index(max(scores))
-    best_ind, best_score = pop[idx], scores[idx]
-    print()
-    print(">0, new best = %f" % (best_score))
-    print()
+    #best_ind, best_score = pop[idx], scores[idx]
+    #print()
+    #print(">0, new best = %f" % (best_score))
+    #print()
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
@@ -299,11 +288,11 @@ if __name__ == '__main__':
 
         # select the best candidate
         idx = scores.index(max(scores))
-        if scores[idx] > best_score:
-            best_ind, best_score = pop[idx], scores[idx]
-            print()
-            print(">%d, new best = %f" % (gen+1, best_score))
-            print()
+        #if scores[idx] > best_score:
+        #    best_ind, best_score = pop[idx], scores[idx]
+        #    print()
+        #    print(">%d, new best = %f" % (gen+1, best_score))
+        #    print()
 
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
