@@ -21,8 +21,8 @@ import module_lammps as lmp
 #     evolutionary reinforcement learning". Phys. Rev. E, 2020. DOI: 10.1103/PhysRevE.101.052604
 # 2 - https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/
 #####################################################################################################
-# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \ 
-#        [-pop POPULATION_SIZE] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
+# usage: run_l2g.py [-h] [-gpus NUMBER_OF_GPUS] [-gen NUMBER_OF_GENERATIONS] \
+#        [-pop POPULATION_SIZE] [-popf POPULATION_FACTOR] [-mr MUTATION_RATE] [-ms MUTATION_SIGMA] [-ts TOURNAMENT_SIZE]    \
 #        [-best NUMBER_OF_RETAINED_SOLUTIONS] [-elitism] [-hid NUMBER_OF_HIDDEN_NODES] [-restart] \
 #        [-tmin MINIMUM_TEMPERATURE] [-tmax MAXIMUM_TEMPERATURE] [-pmin MINIMUM_PRESSURE] \
 #        [-pmax MAXIMUM_PRESSURE] [-opt OPT] [-vtemp INITIAL_TEMPERATURE] [-vpress INITIAL_PRESSURE] \
@@ -105,7 +105,7 @@ hidden_nodes = args.number_of_hidden_nodes
 output_nodes = 2
 
 #define temperature and pressure parameters
-bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]] 
+bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]]
 
 #################################################################################
 # end of parameters
@@ -255,28 +255,17 @@ if __name__ == '__main__':
 
     random.seed(datetime.now())
 
-    # restart L2G from the last state in case it was interrupted
-    if args.restart:
-        value = -1000
-        lines = open("output/restart.dat","r").readlines()
-        for line_idx, data in enumerate(lines):
-            gen_scores = eval(data.split("|")[1])
-            if max(gen_scores) > value:
-                pop = eval(data.split("|")[0])
-                scores = eval(data.split("|")[1])
-                value = max(gen_scores)
-    else:
-        # generate a random initial population: weights and bias of neural networks
-        pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*args.population_factor)]
-        # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, 0, n_pop*args.population_factor)
+    # generate a random initial population: weights and bias of neural networks
+    pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*args.population_factor)]
+    # evaluate all candidates in the population: run neural networks and LAMMPS
+    scores = evaluate(pop, 0, n_pop*args.population_factor)
 
     # select the best candidate
     idx = scores.index(max(scores))
-    best_ind, best_score = pop[idx], scores[idx]
-    print()
-    print(">0, new best = %f" % (best_score))
-    print()
+    #best_ind, best_score = pop[idx], scores[idx]
+    #print()
+    #print(">0, new best = %f" % (best_score))
+    #print()
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
@@ -322,11 +311,11 @@ if __name__ == '__main__':
 
         # select the best candidate
         idx = scores.index(max(scores))
-        if scores[idx] > best_score:
-            best_ind, best_score = pop[idx], scores[idx]
-            print()
-            print(">%d, new best = %f" % (gen+1, best_score))
-            print()
+        #if scores[idx] > best_score:
+        #    best_ind, best_score = pop[idx], scores[idx]
+        #    print()
+        #    print(">%d, new best = %f" % (gen+1, best_score))
+        #    print()
 
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
