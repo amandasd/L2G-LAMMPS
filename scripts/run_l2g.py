@@ -237,7 +237,7 @@ if __name__ == '__main__':
         selected = list(np.array(pop)[np.array(selected_idx)])
 
         if gen == 0:
-            for i in range(0, n_pop):
+            for i in range(0, n_pop*args.population_factor):
                 with open("output/protocol-"+str(i),"a") as outfile:
                     outfile.write("gen {}, {}, {}\n".format(gen,temp[i],press[i]))
 
