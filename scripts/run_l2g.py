@@ -205,7 +205,7 @@ if __name__ == '__main__':
 
     random.seed(datetime.now())
 
-    temp, press = initialize_T_P(n_pop, args.initialize_T_P, args.initial_temperature, args.initial_pressure)
+    temp, press = initialize_T_P(n_pop*args.population_factor, args.initialize_T_P, args.initial_temperature, args.initial_pressure)
 
     # generate a random initial population
     pop = [[random.gauss(0,1) for _ in range(2)] for _ in range(n_pop*args.population_factor)]
