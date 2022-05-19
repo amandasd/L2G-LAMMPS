@@ -26,4 +26,6 @@ export OMP_NUM_THREADS=1
 date
 #T and P -> high score
 python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 32 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 200 -vpress 355467 -tf 100 -pf 150000 -ms 0.3 -hid 1000
+#T and P -> low score
+#python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 32 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 385 -vpress 118319 -tf 100 -pf 150000 -ms 0.3 -hid 1000
 date
