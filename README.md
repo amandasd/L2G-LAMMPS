@@ -6,7 +6,7 @@ The genetic algorithm evolves a population of neural networks. The next populati
 
 Each neural network is represented by a real array of size equal to the total number of its weights and biases. Networks are fully-connected architectures with a single input node (elapsed time of the trajectory), a single hidden layer, and two outputs nodes (changes in temperature and pressure values to be incorporated into LAMMPS simulation).
 
-Changes must be made to the module\_lammps.py file according to your LAMMPS simulation
+Changes must be made to the module\_lammps.py file according to your LAMMPS simulation.
 
 ## Run on Cori GPU
 
