@@ -1,0 +1,40 @@
+variable                n equal 1
+variable                T equal 375
+variable                P equal 150000
+variable                npt_steps equal 50000
+variable                seed equal 1
+
+# ------------------------ INITIALIZATION ----------------------
+units           metal
+boundary        p p p
+atom_style	    atomic
+
+# ----------------------- SYSTEM DEFINITION ---------------------
+read_restart    input/He.restart.1000000
+
+velocity        all create ${T} ${seed} rot yes dist gaussian units box
+
+# ------------------------ FORCE FIELDS -----------------------
+pair_style	    buck 6
+pair_coeff	    * * 384.5451 0.2265 1.1721
+
+# ----------------------- compute ---------------
+compute         CNA all cna/atom 2.58
+compute         avecna  all  reduce  ave  c_CNA
+
+compute         qlwlhat all  orientorder/atom wl/hat yes nnn 16
+compute         avql    all  reduce  ave  c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]
+
+# ----------------------- create a vacancy loop ---------------
+timestep        0.001
+
+# --------------------------- Output ---------------------------
+thermo          5000
+thermo_style    custom step temp pe press lx ly lz c_avql[2] c_avecna
+dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[2]
+dump_modify     1 element Ar
+restart         ${npt_steps} He.restart
+fix             1 all npt temp ${T} ${T} 1.0 iso ${P} ${P} 10.0
+run             ${npt_steps}
+unfix           1
+

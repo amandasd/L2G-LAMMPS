@@ -123,7 +123,6 @@ def mutation(ind, mu, sigma, mut_rate):
             ind[i] += random.gauss(mu,sigma)
         else:
             ind[i] = random.gauss(0,1)
-#TODO: do I need to check bounds?
 
 
 # initialize temperature and pressure values: 0 (random), 1 (fixed values), 2 (mutated from a given value)
