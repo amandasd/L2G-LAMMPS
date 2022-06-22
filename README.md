@@ -1,11 +1,16 @@
 # Learning to Grow for LAMMPS
 
-Learning to Grow consists on a genetic algorithm for optimizing the weights and biases of a fixed neural network topology that evolves self-assembly protocols. The time-dependent protocols of temperature and pressure learned by the neural networks are evaluated via LAMMPS.
+Learning to Grow (Whitelam & Tamblyn, Phys. Rev. E 2020) consists on a genetic algorithm for optimizing the weights and biases of a fixed neural network topology that evolves time-dependent protocols for self-assembly simulations. Here the time-dependent protocols of temperature and pressure learned by the neural networks are evaluated via LAMMPS.
 
 The genetic algorithm evolves a population of neural networks. The next population is made by mutating the best solutions from the current population. Genetic algorithm and neural network parameters as well as temperature and pressure parameters can be set up by users.
 
 Each neural network is represented by a real array of size equal to the total number of its weights and biases. Networks are fully-connected architectures with a single input node (elapsed time of the trajectory), a single hidden layer, and two outputs nodes (changes in temperature and pressure values to be incorporated into LAMMPS simulation).
 
+Learning to Grow for LAMMPS can now be applied to a wide range of molecular dynamics simulations, identifying protocols for producing specific materials and ultimately providing guidance for experiment.
+
+A python wrapper to apply evolutionary reinforcement learning of time-dependent protocols in LAMMPS was developed.
+The wrapper is modular and can be applied to a wide range of systems simulated in parallel.
+<!-- Many LAMMPS simulations are running simultaneously in a parallel way on Cori GPU compute nodes. -->
 Changes must be made to the module\_lammps.py file according to your LAMMPS simulation.
 
 ## Run on Cori GPU
