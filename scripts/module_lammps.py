@@ -5,6 +5,9 @@ from numpy.random import randint
 import numpy as np
 import os,sys
 
+from ovito.modifiers import PolyhedralTemplateMatchingModifier
+from ovito.io import import_file
+
 #################################################################################
 # LAMMPS parameters
 #################################################################################
@@ -38,12 +41,13 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
         newdata = newdata.replace("variable                npt_steps equal 10000","variable                npt_steps equal {}".format(npt_steps))
         # 0 < seed <= 8 digits
         newdata = newdata.replace("variable                seed equal 1","variable                seed equal {}".format(randint(0, 99999999)))
-        newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[2]","dump            1 all custom {} output/He-{}.xyz id type x y z c_qlwlhat[2]".format(dump_freq,p))
-        #newdata = newdata.replace("dump            1 all xyz 10000 output/He.xyz","dump            1 all xyz {} output/He-{}.xyz".format(dump_freq,p))
         newdata = newdata.replace("restart         ${npt_steps} He.restart","restart         {} output/He-{}.restart".format(npt_steps,p))
 
         if state > 0:
             newdata = newdata.replace("read_restart    input/He.restart.1000000","read_restart    output/He-"+str(p)+".restart."+str(state))
+            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z","dump            1 all custom {} output/He-{}-{}-{}.xyz id type x y z".format(dump_freq,gen,p,(state-nve_steps)/npt_steps))
+        else:
+            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z","dump            1 all custom {} output/He-{}-{}-{}.xyz id type x y z".format(dump_freq,gen,p,state))
 
         fileout = "input/in."+str(p)
         f = open(fileout,'w')
@@ -84,19 +88,42 @@ def best_lammps(temp, press, state, gen):
     os.system('./scripts/run_lammps.sh 1 1 1 -1 -1')
 
 
-def get_scores(gen, n, n_iter):
+def get_scores(n, ref_phase='BCC', weights = [1], frame_id=None):
+    ks = ['PolyhedralTemplateMatching.counts.%s'%ref_phase,]
     scores = []
     for p in range(n):
-        if gen <= n_iter:
-            filein = "output/out-"+str(gen)+"-"+str(p)+"."+str(n_steps)
+        filein = "output/He-"+str(p)+".xyz"
+
+        pipeline = import_file(filein)
+        modifier = PolyhedralTemplateMatchingModifier(rmsd_cutoff=0.1, only_selected=False)
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.OTHER].enabled = True
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.FCC].enabled = True
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.HCP].enabled = True
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.BCC].enabled = True
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.ICO].enabled = False
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.SC].enabled = False
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.CUBIC_DIAMOND].enabled = False
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.HEX_DIAMOND].enabled = False
+        modifier.structures[PolyhedralTemplateMatchingModifier.Type.GRAPHENE].enabled = False
+        pipeline.modifiers.append(modifier)
+
+        if frame_id is not None:
+            print('Computing for user-specified frame # %s'%frame_id)
+            data = pipeline.compute(frame_id)
+        elif pipeline.source.num_frames > 1:
+            print('Multiple frames found, computing for last frame')
+            data = pipeline.compute(pipeline.source.num_frames)
         else:
-            filein = "output/scores-best.txt"
-        f = open(filein,'r')
-        lines = f.readlines()
-        f.close()
-        matches = [line for line in lines if "Loop time" in line]
-        index = lines.index(matches[0])
-        scores.append(float(' '.join(lines[index-1].split()).split(' ')[7]))
+            data = pipeline.compute()
+
+        num_particles = data.particles.count
+
+        sc = 0
+        for idx,k in enumerate(ks):
+            sc += weights[idx] * data.attributes[k]/num_particles
+
+        scores.append(sc)
+
     return scores
 
 
@@ -112,6 +139,7 @@ def delete_output_files(gen, n, n_iter):
     # delete dump and out files
     if gen <= n_iter:
         os.system('rm -f output/He-*.dump')
+        os.system('rm -f output/He-*.xyz')
         #os.system('rm -f output/out.*')
 
 #################################################################################

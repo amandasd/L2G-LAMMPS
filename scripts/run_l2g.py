@@ -251,6 +251,7 @@ if __name__ == '__main__':
     os.system('rm -f output/restart.dat')
     os.system('rm -f output/dumpfile.dat')
     os.system('rm -f output/protocol*')
+    os.system('rm -f output/He-*.xyz')
 
     random.seed(datetime.now())
 
