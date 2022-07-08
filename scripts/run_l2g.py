@@ -4,7 +4,7 @@ from numpy.random import randint
 from numpy.random import rand
 import random
 
-from datetime import datetime 
+from datetime import datetime
 
 import numpy as np
 import os,sys
@@ -34,7 +34,7 @@ import module_lammps as lmp
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
 #  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
-#  -popf,    --population-factor PRESSURE_FACTOR                        population factor [default=2]
+#  -popf,    --population-factor PRESSURE_FACTOR                        population factor [default=1]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
@@ -65,7 +65,7 @@ parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L
 # genetic algorithm parameters
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
 parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
-parser.add_argument("-popf", "--population-factor", type=int, default=2, help="population factor [default=2]")
+parser.add_argument("-popf", "--population-factor", type=int, default=1, help="population factor [default=1]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
@@ -210,27 +210,29 @@ def evaluate(pop, gen, n):
     if gen <= n_gen:
         print("[gen %s] running LAMMPS with initial structure" %str(gen))
         lmp.run_lammps(temp, press, 0, gen, n, args.number_of_gpus)
-    else:
-        print("running LAMMPS with initial structure for best solution")
-        lmp.best_lammps(temp, press, 0, gen)
+
+        # save partial scores
+        lmp.get_scores(gen, n, 0)
 
     for s in range(lmp.n_steps):
         node_input = s * 1./lmp.n_steps
         # run neural networks
         temp, press = run_networks(pop, temp, press, node_input, n, gen)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
+
         # run LAMMPS with restart files
         if gen <= n_gen:
             print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
             lmp.run_lammps(temp, press, state, gen, n, args.number_of_gpus)
+
+        if s+1 == lmp.n_steps:
+            # calculate scores
+            scores = lmp.get_scores(gen, n, state)
         else:
-            print("[step %s] running LAMMPS with restart file for best solution" %(str(s)))
-            lmp.best_lammps(temp, press, state, gen)
+            # save partial scores
+            lmp.get_scores(gen, n, state)
 
-    # calculate scores
-    scores = lmp.get_scores(gen, n, n_gen)
-
-    lmp.delete_output_files(gen, n, n_gen)
+    #lmp.delete_output_files(gen, n, n_gen)
 
     return scores
 
@@ -252,8 +254,9 @@ if __name__ == '__main__':
     os.system('rm -f output/dumpfile.dat')
     os.system('rm -f output/protocol*')
     os.system('rm -f output/He-*.xyz')
+    os.system('rm -f output/score*')
 
-    random.seed(datetime.now())
+    random.seed(datetime.now().timestamp())
 
     # generate a random initial population: weights and bias of neural networks
     pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*args.population_factor)]
@@ -261,22 +264,22 @@ if __name__ == '__main__':
     scores = evaluate(pop, 0, n_pop*args.population_factor)
 
     # select the best candidate
-    idx = scores.index(max(scores))
-    #best_ind, best_score = pop[idx], scores[idx]
-    #print()
-    #print(">0, new best = %f" % (best_score))
-    #print()
+    idx = scores.index(min(scores))
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, scores[idx]))
 
+    lmp.delete_output_files(0, n_pop*args.population_factor, n_gen)
+
     for gen in range(n_gen): # maximum number of iterations
 
         elitism = args.elitism
 
-        # rank the scores
-        indices = [scores.index(x) for x in sorted(scores, reverse=True)]
+        # rank the scores for minimum problem
+        indices = list(np.argsort(scores))
+        # rank the scores for maximum problem
+        #indices = list(np.argsort(scores)[::-1])
 
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
@@ -310,20 +313,13 @@ if __name__ == '__main__':
             outfile2.write("{} | {}\n".format(pop,scores))
 
         # select the best candidate
-        idx = scores.index(max(scores))
-        #if scores[idx] > best_score:
-        #    best_ind, best_score = pop[idx], scores[idx]
-        #    print()
-        #    print(">%d, new best = %f" % (gen+1, best_score))
-        #    print()
+        idx = scores.index(min(scores))
 
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
             outfile1.write("{} {} {}\n".format(gen+1, idx, scores[idx]))
 
-    # evaluate the best candidate
-    #scores = evaluate([pop[idx]], n_gen+1, 1)
-    #print("best = %f" % (scores[0]))
+        lmp.delete_output_files(gen+1, n_pop, n_gen)
 
 #################################################################################
 # end of main code

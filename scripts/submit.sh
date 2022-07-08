@@ -2,7 +2,7 @@
 #SBATCH -A nstaff
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 05:30:00
+#SBATCH -t 04:10:00
 #SBATCH --nodes 1
 #SBATCH -G 8
 #SBATCH -n 40
@@ -13,19 +13,20 @@
 #SBATCH --output=l2g.out
 
 HOME="$(pwd)"
+PYTHONDIR="/global/homes/a/asdufek/.conda/envs/polymorph/bin"
 
 module purge
 module load cgpu
 module load cmake
 module load PrgEnv-llvm/12.0.0-git_20210117
-module load python/3.8-anaconda-2020.11
+module load python/3.9-anaconda-2021.11
 
 export LAMMPS_DIR=$HOME
 export OMP_NUM_THREADS=1
 
 date
 #T and P -> high score
-#python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 32 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 200 -vpress 355467 -tf 100 -pf 150000 -ms 0.3 -hid 1000
+#$PYTHONDIR/python3.9 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 32 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 200 -vpress 355467 -tf 100 -pf 150000 -ms 0.3 -hid 1000
 #T and P -> low score
-python3.8 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 32 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 385 -vpress 118319 -tf 100 -pf 150000 -ms 0.3 -hid 1000
+$PYTHONDIR/python3.9 $HOME/scripts/run_l2g.py -gpus 8 -pop 16 -popf 3 -best 8 -gen 40 -tmin 200 -tmax 400 -pmin 100000 -pmax 400000 -opt 1 -vtemp 385 -vpress 118319 -tf 100 -pf 150000 -ms 0.3 -hid 1000
 date
