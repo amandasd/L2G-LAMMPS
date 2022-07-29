@@ -40,6 +40,7 @@ import module_lammps as lmp
 #  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
 #  -e,       --elitism                                                  elitism [default=True]
 #  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
+#  -input,   --number-of-input-nodes INPUT_NODES                        number of input nodes: 1 or 3 [default=1]
 #  -tmin,    --minimum-temperature MINIMUM_TEMPERATURE                  minimum temperature value [default=0.5]
 #  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
 #  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
@@ -73,6 +74,7 @@ parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [d
 
 # neural network parameters
 parser.add_argument("-hid", "--number-of-hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
+parser.add_argument("-input", "--number-of-input-nodes", type=int, choices=[1, 3], default=1, help="number of input nodes: 1 or 3 [default=1]")
 
 # temperature and pressure parameters
 parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, help="minimum temperature value [default=0.5]")
@@ -100,7 +102,7 @@ if n_best > n_pop:
     n_best = int(np.ceil(n_pop * 0.1))
 
 # define neural network parameters
-input_nodes  = 1
+input_nodes  = args.number_of_input_nodes
 hidden_nodes = args.number_of_hidden_nodes
 output_nodes = 2
 
@@ -158,13 +160,13 @@ def initialize_T_P(n, opt, vtemp=None, vpress=None):
 
 
 # run neural networks
-def run_networks(pop, temp, press, node_input, n, gen):
+def run_networks(pop, temp, press, time, n, gen):
 
     for p in range(n):
 
-        if int(node_input*lmp.n_steps) == 0:
+        if int(time*lmp.n_steps) == 0:
             with open("output/protocol-"+str(p),"a") as outfile:
-                outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p]))
+                outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(time*lmp.n_steps),temp[p],press[p]))
 
         # get weights and bias
         bias_hidden = pop[p][:hidden_nodes]
@@ -172,6 +174,16 @@ def run_networks(pop, temp, press, node_input, n, gen):
         weight_ih = np.reshape(weight_ih,(input_nodes,hidden_nodes))
         weight_ho = pop[p][hidden_nodes+input_nodes*hidden_nodes:hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes]
         weight_ho = np.reshape(weight_ho,(hidden_nodes,output_nodes))
+
+        node_input = np.zeros(shape=(input_nodes), dtype=float)
+        if input_nodes == 1:
+            node_input[0] = time
+        elif input_nodes == 3:
+            node_input[0] = time
+            node_input[1] = temp[p]
+            node_input[2] = press[p]
+        else:
+            print("Valid options: 1 and 3")
 
         # calculate Sj
         node_hidden = np.zeros(shape=(hidden_nodes), dtype=float)
@@ -193,7 +205,7 @@ def run_networks(pop, temp, press, node_input, n, gen):
             press[p] = 0
 
         with open("output/protocol-"+str(p),"a") as outfile:
-            outfile.write("gen {}, step {}, {}, {}, {}, {}\n".format(gen,int(node_input*lmp.n_steps),temp[p],press[p],node_output[0],node_output[1]))
+            outfile.write("gen {}, step {}, {}, {}, {}, {}\n".format(gen,int(time*lmp.n_steps),temp[p],press[p],node_output[0],node_output[1]))
 
     return temp, press
 
@@ -215,9 +227,9 @@ def evaluate(pop, gen, n):
         lmp.get_scores(gen, n, 0)
 
     for s in range(lmp.n_steps):
-        node_input = s * 1./lmp.n_steps
+        time = s * 1./lmp.n_steps
         # run neural networks
-        temp, press = run_networks(pop, temp, press, node_input, n, gen)
+        temp, press = run_networks(pop, temp, press, time, n, gen)
         state = s*lmp.npt_steps+lmp.npt_steps+lmp.nve_steps
 
         # run LAMMPS with restart files
