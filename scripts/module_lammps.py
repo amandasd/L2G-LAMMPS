@@ -61,7 +61,7 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
         os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(state))
 
 
-def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
+def get_scores(gen, n, state, ref_phase='BCC', weights = [1], frame_id=None):
 
     if state > 0:
         step = (int((state-nve_steps)/npt_steps))
