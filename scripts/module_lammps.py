@@ -13,9 +13,9 @@ from ovito.io import import_file
 #################################################################################
 
 nve_steps = 1000000
-npt_steps = 50000
-n_steps = 10 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
-dump_freq = 60000
+npt_steps = 5000
+n_steps = 5 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+dump_freq = 6000
 
 #################################################################################
 # end of parameters
@@ -38,7 +38,7 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
 
         newdata = filedata.replace("variable                T equal 375","variable                T equal {}".format(temp[p]))
         newdata = newdata.replace("variable                P equal 150000","variable                P equal {}".format(press[p]))
-        newdata = newdata.replace("variable                npt_steps equal 10000","variable                npt_steps equal {}".format(npt_steps))
+        newdata = newdata.replace("variable                npt_steps equal 50000","variable                npt_steps equal {}".format(npt_steps))
         # 0 < seed <= 8 digits
         newdata = newdata.replace("variable                seed equal 1","variable                seed equal {}".format(randint(0, 99999999)))
         newdata = newdata.replace("restart         ${npt_steps} He.restart","restart         {} output/He-{}.restart".format(npt_steps,p))
@@ -68,7 +68,7 @@ def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
     else:
         step = state
 
-    scores = []
+    scores = []; particles = []
     for p in range(n):
         filein = "output/He-"+str(gen)+"-"+str(p)+"-"+str(step)+".xyz"
         f = open(filein,'r')
@@ -135,8 +135,13 @@ def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
 
         if step == n_steps:
             scores.append(q/(4.0*num_particles))
+            if ref_phase == "FCC":
+                particles.append(fcc)
+            elif ref_phase == "BCC":
+                particles.append(bcc)
 
-    return scores
+
+    return scores, particles
 
 
 def delete_output_files(gen, n, n_iter):

@@ -32,15 +32,17 @@ import module_lammps as lmp
 #  -h, --help                                                           show this help message and exit
 #  -r, --restart                                                        restart L2G from the last state in case it was interrupted [default=False]
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
+#  -s,       --strategy STRATEGY                                        strategy: ga, GA, mc, MC [default=ga]
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
-#  -pop,     --population-size POPULATION_SIZE                          population size [default=8]
+#  -pop,     --population-size POPULATION_SIZE                          population size [default=1]
 #  -popf,    --population-factor PRESSURE_FACTOR                        population factor [default=1]
 #  -mr,      --mutation-rate MUTATION_RATE                              mutation rate (value between 0 and 1) [default=1]
 #  -ms,      --mutation-sigma MUTATION_SIGMA                            sigma of gaussian random number (value between 0 and 1) [default=0.01]
-#  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=4]
-#  -e,       --elitism                                                  elitism [default=True]
+#  -best,    --number-of-retained-solutions NUMBER_OF_BEST_SOLUTIONS    number of best candidates selected to generate new candidates [default=1]
+#  -e,       --elitism                                                  elitism [default=False]
+#  -sim,     --number-of-simulations NUMBER_OF_SIMULATIONS              number of simulations for each candidate solution [default=1]
 #  -hid,     --number-of-hidden-nodes HIDDEN_NODES                      number of hidden nodes [default=10]
-#  -input,   --number-of-input-nodes INPUT_NODES                        number of input nodes: 1 or 3 [default=1]
+#  -input,   --number-of-input-nodes INPUT_NODES                        number of input nodes: 1, 3 [default=1]
 #  -tmin,    --minimum-temperature MINIMUM_TEMPERATURE                  minimum temperature value [default=0.5]
 #  -tmax,    --maximum-temperature MAXIMUM_TEMPERATURE                  maximum temperature value [default=2]
 #  -pmin,    --minimum-pressure MINIMUM_PRESSURE                        minimum pressure value [default=0.5]
@@ -61,20 +63,24 @@ import module_lammps as lmp
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of gpus [default=1]")
+parser.add_argument("-s", "--strategy", choices=['ga', 'GA', 'mc', 'MC'], default="ga", help="Strategy: ga, GA, mc, MC [default=ga]")
 parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
 
 # genetic algorithm parameters
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
-parser.add_argument("-pop", "--population-size", type=int, default=8, help="population size [default=8]")
+parser.add_argument("-pop", "--population-size", type=int, default=1, help="population size [default=1]")
 parser.add_argument("-popf", "--population-factor", type=int, default=1, help="population factor [default=1]")
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
-parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=4, help="number of best candidates selected to generate new candidates [default=4]")
-parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=True]")
+parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=1, help="number of best candidates selected to generate new candidates [default=1]")
+parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=False]")
+
+# monte carlo parameters
+parser.add_argument("-sim", "--number-of-simulations", type=int, default=1, help="number of simulations for each candidate solution [default=1]")
 
 # neural network parameters
 parser.add_argument("-hid", "--number-of-hidden-nodes", type=int, default=10, help="number of hidden nodes [default=10]")
-parser.add_argument("-input", "--number-of-input-nodes", type=int, choices=[1, 3], default=1, help="number of input nodes: 1 or 3 [default=1]")
+parser.add_argument("-input", "--number-of-input-nodes", type=int, choices=[1, 3], default=1, help="number of input nodes: 1, 3 [default=1]")
 
 # temperature and pressure parameters
 parser.add_argument("-tmin", "--minimum-temperature", type=float, default=0.5, help="minimum temperature value [default=0.5]")
@@ -92,9 +98,14 @@ args = parser.parse_args()
 # define genetic algorithm parameters
 n_gen     = args.number_of_generations
 n_pop     = args.population_size
+n_best    = args.number_of_retained_solutions
+pop_f     = args.population_factor
 mut_rate  = args.mutation_rate
 mut_sigma = args.mutation_sigma
-n_best    = args.number_of_retained_solutions
+e_flag    = args.elitism
+
+# define monte carlo parameter
+n_sim = args.number_of_simulations
 
 if mut_rate > 1 or mut_rate < 0:
     mut_rate = 1
@@ -108,6 +119,15 @@ output_nodes = 2
 
 #define temperature and pressure parameters
 bounds = [[args.minimum_temperature, args.maximum_temperature], [args.minimum_pressure, args.maximum_pressure]]
+
+if args.strategy.upper() == 'GA':
+   n_sim  = 1
+elif args.strategy.upper() == 'MC':
+   n_pop  = 1
+   n_best = 1
+   pop_f  = 1
+   e_flag = False
+
 
 #################################################################################
 # end of parameters
@@ -239,14 +259,14 @@ def evaluate(pop, gen, n):
 
         if s+1 == lmp.n_steps:
             # calculate scores
-            scores = lmp.get_scores(gen, n, state)
+            scores, particles = lmp.get_scores(gen, n, state)
         else:
             # save partial scores
             lmp.get_scores(gen, n, state)
 
     #lmp.delete_output_files(gen, n, n_gen)
 
-    return scores
+    return scores, particles
 
 #################################################################################
 # end of functions
@@ -258,10 +278,10 @@ def evaluate(pop, gen, n):
 if __name__ == '__main__':
 
     print()
-    print("-gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -popf "+str(args.population_factor)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(args.elitism)+" -hid "+str(hidden_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
+    print("-s "+str(args.strategy)+" -gpus "+str(args.number_of_gpus)+" -gen "+str(n_gen)+" -pop "+str(n_pop)+" -popf "+str(pop_f)+" -sim "+str(n_sim)+" -mr "+str(mut_rate)+" -ms "+str(mut_sigma)+" -best "+str(n_best)+" -elitism "+str(e_flag)+" -hid "+str(hidden_nodes)+" -input "+str(input_nodes)+" -restart "+str(args.restart)+" -tmin "+str(args.minimum_temperature)+" -tmax "+str(args.maximum_temperature)+" -pmin "+str(args.minimum_pressure)+" -pmax "+str(args.maximum_pressure)+" -opt "+str(args.initialize_T_P)+" -vtemp "+str(args.initial_temperature)+" -vpress "+str(args.initial_pressure)+" -tf "+str(args.temperature_factor)+" -pf "+str(args.pressure_factor))
     print()
 
-    # delete previous files: restart.dat and dumpfile.dat
+    # delete previous files
     os.system('rm -f output/restart.dat')
     os.system('rm -f output/dumpfile.dat')
     os.system('rm -f output/protocol*')
@@ -271,22 +291,30 @@ if __name__ == '__main__':
     random.seed(datetime.now().timestamp())
 
     # generate a random initial population: weights and bias of neural networks
-    pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*args.population_factor)]
-    # evaluate all candidates in the population: run neural networks and LAMMPS
-    scores = evaluate(pop, 0, n_pop*args.population_factor)
+    pop = [[random.gauss(0,1) for _ in range(hidden_nodes+input_nodes*hidden_nodes+output_nodes*hidden_nodes)] for _ in range(n_pop*pop_f)]
+    # n-sim-plicate the member of pop
+    pop = (np.repeat(pop, repeats=n_sim, axis=0)).tolist()
 
-    # select the best candidate
-    idx = scores.index(min(scores))
+    # evaluate all candidates in the population: run neural networks and LAMMPS
+    scores, particles = evaluate(pop, 0, len(pop))
+
+    if args.strategy.upper() == 'GA':
+        # select the best candidate
+        idx = scores.index(min(scores))
+    elif args.strategy.upper() == 'MC':
+        # average scores
+        idx = 0; scores[idx] = np.mean(scores)
+        particles[idx] = np.mean(particles)
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, scores[idx]))
 
-    lmp.delete_output_files(0, n_pop*args.population_factor, n_gen)
+    lmp.delete_output_files(0, len(pop), n_gen)
 
     for gen in range(n_gen): # maximum number of iterations
 
-        elitism = args.elitism
+        elitism = e_flag
 
         # rank the scores for minimum problem
         indices = list(np.argsort(scores))
@@ -295,10 +323,7 @@ if __name__ == '__main__':
 
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
-        if gen == 0:
-            selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop*args.population_factor))])
-        else:
-            selected_idx = list(np.array(indices)[np.array(randint(0, n_best, n_pop))])
+        selected_idx = list(np.array(indices)[np.array(randint(0, n_best, len(pop)))])
         selected = list(np.array(pop)[np.array(selected_idx)])
 
         # create the next generation
@@ -314,24 +339,41 @@ if __name__ == '__main__':
             mutation(ind, 0, mut_sigma, mut_rate)
             # store for next generation
             new_pop.append(ind)
-        # replace population
-        pop = new_pop
 
-        # evaluate all candidates in the population: run neural networks and LAMMPS
-        scores = evaluate(pop, gen+1, n_pop)
+        if args.strategy.upper() == 'GA':
+            # replace population
+            pop = new_pop
+
+            # evaluate all candidates in the population: run neural networks and LAMMPS
+            scores, particles = evaluate(pop, gen+1, len(pop))
+
+            # select the best candidate
+            idx = scores.index(min(scores))
+        elif args.strategy.upper() == 'MC':
+            # n-sim-plicate the member of pop
+            new_pop = (np.repeat(new_pop, repeats=n_sim, axis=0)).tolist()
+
+            # evaluate all candidates in the population: run neural networks and LAMMPS
+            new_scores, new_particles = evaluate(new_pop, gen+1, len(new_pop))
+
+            # average scores
+            idx = 0; new_scores[idx] = np.mean(new_scores)
+            new_particles[idx] = np.mean(new_particles)
+
+            # minimum problem
+            if (new_scores[idx] < scores[idx]) || new_particles[idx] > particles[idx]:
+                pop = new_pop
+                scores = new_scores
 
         # save population and scores in order to restart L2G from the last state in case of being interrupted
         with open("output/restart.dat","a") as outfile2:
             outfile2.write("{} | {}\n".format(pop,scores))
 
-        # select the best candidate
-        idx = scores.index(min(scores))
-
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
             outfile1.write("{} {} {}\n".format(gen+1, idx, scores[idx]))
 
-        lmp.delete_output_files(gen+1, n_pop, n_gen)
+        lmp.delete_output_files(gen+1, len(pop), n_gen)
 
 #################################################################################
 # end of main code
