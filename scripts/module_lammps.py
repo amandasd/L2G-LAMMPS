@@ -161,7 +161,8 @@ def delete_output_files(gen, n, n_iter):
     f.close()
 
     ind = int(dump_lines[gen].split(' ')[1])
-    os.system('rm output/He-!('+str(gen)+')-!('+str(ind)+')-*.xyz')
+    os.system('bash -c \"rm output/He-'+str(gen)+'-!('+str(ind)+')-*.xyz\"')
+
 
 #################################################################################
 # end of functions
