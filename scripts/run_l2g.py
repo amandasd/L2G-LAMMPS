@@ -361,7 +361,7 @@ if __name__ == '__main__':
             new_particles[idx] = np.mean(new_particles)
 
             # minimum problem
-            if (new_scores[idx] < scores[idx]) || new_particles[idx] > particles[idx]:
+            if (new_scores[idx] < scores[idx]) or (new_particles[idx] > particles[idx]):
                 pop = new_pop
                 scores = new_scores
 
