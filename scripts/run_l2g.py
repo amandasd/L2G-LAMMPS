@@ -31,6 +31,7 @@ import module_lammps as lmp
 # arguments:
 #  -h, --help                                                           show this help message and exit
 #  -r, --restart                                                        restart L2G from the last state in case it was interrupted [default=False]
+#  -odir,    --output-directory OUTPUT_DIRECTORY                        output directory [default=output]
 #  -gpus,    --number-of-gpus NUMBER_OF_GPUS                            number of gpus [default=1]
 #  -s,       --strategy STRATEGY                                        strategy: ga, GA, mc, MC [default=ga]
 #  -gen,     --number-of-generations NUMBER_OF_GENERATIONS              number of generations [default=2]
@@ -65,6 +66,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-gpus", "--number-of-gpus", type=int, default=1, help="number of gpus [default=1]")
 parser.add_argument("-s", "--strategy", choices=['ga', 'GA', 'mc', 'MC'], default="ga", help="Strategy: ga, GA, mc, MC [default=ga]")
 parser.add_argument("-r", "--restart", type=bool, default=False, help="restart L2G from the last state in case it was interrupted [default=False]")
+parser.add_argument("-odir", "--output-directory",  default="output", help="output directory [default=output]")
 
 # genetic algorithm parameters
 parser.add_argument("-gen", "--number-of-generations", type=int, default=2, help="number of generations [default=2]")
@@ -185,7 +187,7 @@ def run_networks(pop, temp, press, time, n, gen):
     for p in range(n):
 
         if int(time*lmp.n_steps) == 0:
-            with open("output/protocol-"+str(p),"a") as outfile:
+            with open(args.output_directory+"/protocol-"+str(p),"a") as outfile:
                 outfile.write("gen {}, step {}, {}, {}\n".format(gen,int(time*lmp.n_steps),temp[p],press[p]))
 
         # get weights and bias
@@ -224,7 +226,7 @@ def run_networks(pop, temp, press, time, n, gen):
         if press[p] < 0:
             press[p] = 0
 
-        with open("output/protocol-"+str(p),"a") as outfile:
+        with open(args.output_directory+"/protocol-"+str(p),"a") as outfile:
             outfile.write("gen {}, step {}, {}, {}, {}, {}\n".format(gen,int(time*lmp.n_steps),temp[p],press[p],node_output[0],node_output[1]))
 
     return temp, press
@@ -241,10 +243,10 @@ def evaluate(pop, gen, n):
     # run LAMMPS with initial structure
     if gen <= n_gen:
         print("[gen %s] running LAMMPS with initial structure" %str(gen))
-        lmp.run_lammps(temp, press, 0, gen, n, args.number_of_gpus)
+        lmp.run_lammps(temp, press, 0, gen, n, args.number_of_gpus, args.output_directory)
 
         # save partial scores
-        lmp.get_scores(gen, n, 0)
+        lmp.get_scores(gen, n, 0, args.output_directory)
 
     for s in range(lmp.n_steps):
         time = s * 1./lmp.n_steps
@@ -255,16 +257,16 @@ def evaluate(pop, gen, n):
         # run LAMMPS with restart files
         if gen <= n_gen:
             print("[gen %s; step %s] running LAMMPS with restart file" %(str(gen), str(s)))
-            lmp.run_lammps(temp, press, state, gen, n, args.number_of_gpus)
+            lmp.run_lammps(temp, press, state, gen, n, args.number_of_gpus, args.output_directory)
 
         if s+1 == lmp.n_steps:
             # calculate scores
-            scores, particles = lmp.get_scores(gen, n, state)
+            scores, particles = lmp.get_scores(gen, n, state, args.output_directory)
         else:
             # save partial scores
-            lmp.get_scores(gen, n, state)
+            lmp.get_scores(gen, n, state, args.output_directory)
 
-    #lmp.delete_output_files(gen, n, n_gen)
+    #lmp.delete_output_files(gen, n, n_gen, args.output_directory)
 
     return scores, particles
 
@@ -282,11 +284,11 @@ if __name__ == '__main__':
     print()
 
     # delete previous files
-    os.system('rm -f output/restart.dat')
-    os.system('rm -f output/dumpfile.dat')
-    os.system('rm -f output/protocol*')
-    os.system('rm -f output/He-*.xyz')
-    os.system('rm -f output/score*')
+    os.system('rm -f '+args.output_directory+'/restart.dat')
+    os.system('rm -f '+args.output_directory+'/dumpfile.dat')
+    os.system('rm -f '+args.output_directory+'/protocol*')
+    os.system('rm -f '+args.output_directory+'/He-*.xyz')
+    os.system('rm -f '+args.output_directory+'/score*')
 
     random.seed(datetime.now().timestamp())
 
@@ -307,10 +309,10 @@ if __name__ == '__main__':
         particles[idx] = np.mean(particles)
 
     # save generation, best index, and best score in an output file
-    with open("output/dumpfile.dat","a") as outfile1:
+    with open(args.output_directory+"/dumpfile.dat","a") as outfile1:
         outfile1.write("{} {} {}\n".format(0, idx, scores[idx]))
 
-    lmp.delete_output_files(0, len(pop), n_gen)
+    lmp.delete_output_files(0, len(pop), n_gen, args.output_directory)
 
     for gen in range(n_gen): # maximum number of iterations
 
@@ -366,14 +368,14 @@ if __name__ == '__main__':
                 scores = new_scores
 
         # save population and scores in order to restart L2G from the last state in case of being interrupted
-        with open("output/restart.dat","a") as outfile2:
+        with open(args.output_directory+"/restart.dat","a") as outfile2:
             outfile2.write("{} | {}\n".format(pop,scores))
 
         # save generation, best index, and best score in an output file
-        with open("output/dumpfile.dat","a") as outfile1:
+        with open(args.output_directory+"/dumpfile.dat","a") as outfile1:
             outfile1.write("{} {} {}\n".format(gen+1, idx, scores[idx]))
 
-        lmp.delete_output_files(gen+1, len(pop), n_gen)
+        lmp.delete_output_files(gen+1, len(pop), n_gen, args.output_directory)
 
 #################################################################################
 # end of main code

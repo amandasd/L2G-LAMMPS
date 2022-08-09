@@ -26,7 +26,7 @@ dump_freq = 6000
 #################################################################################
 
 # run LAMMPS for all candidates in the population
-def run_lammps(temp, press, state, gen, n_pop, n_gpus):
+def run_lammps(temp, press, state, gen, n_pop, n_gpus, odir):
     # template to generate the LAMMPS input files for each candidate in the population
     filein = "input/He-in.restart"
     f = open(filein,'r')
@@ -41,27 +41,27 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus):
         newdata = newdata.replace("variable                npt_steps equal 50000","variable                npt_steps equal {}".format(npt_steps))
         # 0 < seed <= 8 digits
         newdata = newdata.replace("variable                seed equal 1","variable                seed equal {}".format(randint(0, 99999999)))
-        newdata = newdata.replace("restart         ${npt_steps} He.restart","restart         {} output/He-{}.restart".format(npt_steps,p))
+        newdata = newdata.replace("restart         ${npt_steps} He.restart","restart         {} {}/He-{}.restart".format(npt_steps,odir,p))
 
         if state > 0:
-            newdata = newdata.replace("read_restart    input/He.restart.1000000","read_restart    output/He-"+str(p)+".restart."+str(state))
-            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]","dump            1 all custom {} output/He-{}-{}-{}.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]".format(dump_freq,gen,p,int((state-nve_steps)/npt_steps)))
+            newdata = newdata.replace("read_restart    input/He.restart.1000000","read_restart    {}/He-{}.restart.{}".format(odir,p,state))
+            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]","dump            1 all custom {} {}/He-{}-{}-{}.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]".format(dump_freq,odir,gen,p,int((state-nve_steps)/npt_steps)))
         else:
-            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]","dump            1 all custom {} output/He-{}-{}-{}.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]".format(dump_freq,gen,p,state))
+            newdata = newdata.replace("dump            1 all custom 10000 output/He.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]","dump            1 all custom {} {}/He-{}-{}-{}.xyz id type x y z c_qlwlhat[1] c_qlwlhat[2] c_qlwlhat[3] c_qlwlhat[4] c_qlwlhat[5]".format(dump_freq,odir,gen,p,state))
 
-        fileout = "input/in."+str(p)
+        fileout = str(odir)+"/in."+str(p)
         f = open(fileout,'w')
         f.write(newdata)
         f.close()
 
     # run LAMMPS for each candidate in the population
     if state > 0:
-        os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(int((state-nve_steps)/npt_steps)))
+        os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(int((state-nve_steps)/npt_steps))+' '+str(odir))
     else:
-        os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(state))
+        os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(state)+' '+str(odir))
 
 
-def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
+def get_scores(gen, n, state, odir, ref_phase='FCC', weights=[1], frame_id=None):
 
     if state > 0:
         step = (int((state-nve_steps)/npt_steps))
@@ -70,7 +70,7 @@ def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
 
     scores = []; particles = []
     for p in range(n):
-        filein = "output/He-"+str(gen)+"-"+str(p)+"-"+str(step)+".xyz"
+        filein = str(odir)+"/He-"+str(gen)+"-"+str(p)+"-"+str(step)+".xyz"
         f = open(filein,'r')
         lines = f.readlines()
         f.close()
@@ -130,7 +130,7 @@ def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
             elif ref_phase == "BCC":
                q += ((q4-0.22402525)**2) + ((q6-0.56693995)**2) + ((q8-0.32595545)**2) + ((q10-0.41235015)**2) + ((q12-0.3760503)**2)
 
-        with open("output/score-"+str(gen)+"-"+str(p)+"."+str(step),"a") as outfile:
+        with open(str(odir)+"/score-"+str(gen)+"-"+str(p)+"."+str(step),"a") as outfile:
             outfile.write("{}, {}, {}, {}\n".format(fcc, bcc, other, q/(4.0*num_particles)))
 
         if step == n_steps:
@@ -144,19 +144,19 @@ def get_scores(gen, n, state, ref_phase='FCC', weights = [1], frame_id=None):
     return scores, particles
 
 
-def delete_output_files(gen, n, n_iter):
+def delete_output_files(gen, n, n_iter, odir):
     ini_state = npt_steps+nve_steps
     end_state = n_steps*npt_steps+npt_steps+nve_steps+nve_steps
     # delete restart files
     for i in np.arange(ini_state,end_state,1000):
         if gen <= n_iter:
-            os.system('rm -f output/He-*.restart.'+str(i))
+            os.system('rm -f '+str(odir)+'/He-*.restart.'+str(i))
     # delete dump and out files
     if gen <= n_iter:
-        os.system('rm -f output/He-*.dump')
-        #os.system('rm -f output/out.*')
+        os.system('rm -f '+str(odir)+'/He-*.dump')
+        #os.system('rm -f '+str(odir)+'/out.*')
 
-    nfile = 'output/dumpfile.dat'
+    nfile = str(odir)+'/dumpfile.dat'
     try:
        f = open(nfile,"r")
     except IOError:
@@ -166,7 +166,7 @@ def delete_output_files(gen, n, n_iter):
     f.close()
 
     ind = int(dump_lines[gen].split(' ')[1])
-    os.system('bash -c \"rm output/He-'+str(gen)+'-!('+str(ind)+')-*.xyz\"')
+    os.system('bash -c \"rm '+str(odir)+'/He-'+str(gen)+'-!('+str(ind)+')-*.xyz\"')
 
 
 #################################################################################
