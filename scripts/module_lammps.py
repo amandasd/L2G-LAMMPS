@@ -13,9 +13,9 @@ from ovito.io import import_file
 #################################################################################
 
 nve_steps = 1000000
-npt_steps = 5000
-n_steps = 5 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
-dump_freq = 6000
+npt_steps = 50000
+n_steps = 10 #number total of steps = n_steps * npt_steps + (nve_steps + npt_steps)
+dump_freq = 60000
 
 #################################################################################
 # end of parameters
