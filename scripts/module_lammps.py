@@ -4,6 +4,7 @@ from numpy.random import randint
 
 import numpy as np
 import os,sys
+import re
 
 from ovito.modifiers import PolyhedralTemplateMatchingModifier
 from ovito.io import import_file
@@ -43,7 +44,7 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus, odir):
 
         # 0 < seed <= 8 digits
         seed = randint(0, 99999999)
-        with open(args.output_directory+"/seed-"+str(p),"a") as outfile:
+        with open(str(odir)+"/seed-"+str(p),"a") as outfile:
              outfile.write("gen {}, step {}, {}\n".format(gen,step,seed))
 
         newdata = filedata.replace("variable                T equal 375","variable                T equal {}".format(temp[p]))
@@ -63,6 +64,35 @@ def run_lammps(temp, press, state, gen, n_pop, n_gpus, odir):
 
     # run LAMMPS for each candidate in the population
     os.system('./scripts/run_lammps.sh '+str(n_pop)+' '+str(n_gpus)+' 0'+' '+str(gen)+' '+str(step)+' '+str(odir))
+
+    for p in range(n_pop):
+
+        nfile = str(odir)+'/out-'+str(gen)+'-'+str(p)+'.'+str(step)
+        try:
+            f = open(nfile,"r")
+        except IOError:
+            print >> sys.stderr, "Could not open file " + nfile
+            sys.exit(1)
+        lines = f.readlines()
+        f.close()
+
+        for i in range(len(lines)):
+           if 'Step Temp PotEng Press Lx Ly Lz c_avql[2] c_avecna' in lines[i]:
+              line = i+1
+              break
+        for i in range(line+1,len(lines)):
+           if (re.sub('\s+',' ',lines[i]).split(' ')[8][0]).isnumeric():
+                 s_press = float(re.sub('\s+',' ',lines[i]).split(' ')[4])
+                 diff = np.abs(press[p]-s_press);
+                 if diff >= press[p]*0.15:
+                     print("Pressure values[gen "+str(gen)+"; ind "+str(p)+"; step "+str(step)+"]: "+str(s_press)+"/"+str(press[p]))
+                 s_temp  = float(re.sub('\s+',' ',lines[i]).split(' ')[2])
+                 diff = np.abs(temp[p]-s_temp);
+                 if diff >= temp[p]*0.15:
+                     print("Temperature values[gen "+str(gen)+"; ind "+str(p)+"; step "+str(step)+"]: "+str(s_temp)+"/"+str(temp[p]))
+           if 'Loop time of ' in lines[i+1]:
+              break
+
 
 def get_scores(gen, n, state, odir, ref_phase='BCC', weights=[1], frame_id=None):
 
@@ -143,7 +173,6 @@ def get_scores(gen, n, state, odir, ref_phase='BCC', weights=[1], frame_id=None)
             elif ref_phase == "BCC":
                 particles.append(bcc)
 
-
     return scores, particles
 
 
@@ -159,17 +188,17 @@ def delete_output_files(gen, n, n_iter, odir):
         os.system('rm -f '+str(odir)+'/He-*.dump')
         #os.system('rm -f '+str(odir)+'/out.*')
 
-    nfile = str(odir)+'/dumpfile.dat'
-    try:
-       f = open(nfile,"r")
-    except IOError:
-       print >> sys.stderr, "Could not open file " + nfile
-       sys.exit(1)
-    dump_lines = f.readlines()
-    f.close()
-
-    ind = int(dump_lines[gen].split(' ')[1])
-    os.system('bash -c \"rm '+str(odir)+'/He-'+str(gen)+'-!('+str(ind)+')-*.xyz\"')
+#    nfile = str(odir)+'/dumpfile.dat'
+#    try:
+#       f = open(nfile,"r")
+#    except IOError:
+#       print >> sys.stderr, "Could not open file " + nfile
+#       sys.exit(1)
+#    dump_lines = f.readlines()
+#    f.close()
+#
+#    ind = int(dump_lines[gen].split(' ')[1])
+#    os.system('bash -c \"rm '+str(odir)+'/He-'+str(gen)+'-!('+str(ind)+')-*.xyz\"')
 
 
 #################################################################################

@@ -75,7 +75,7 @@ parser.add_argument("-popf", "--population-factor", type=int, default=1, help="p
 parser.add_argument("-mr", "--mutation-rate", type=float, default=1, help="mutation rate (value between 0 and 1) [default=1]")
 parser.add_argument("-ms", "--mutation-sigma", type=float, default=0.01, help="sigma of gaussian random number (value between 0 and 1) [default=0.01]")
 parser.add_argument("-best", "--number-of-retained-solutions", type=int, default=1, help="number of best candidates selected to generate new candidates [default=1]")
-parser.add_argument("-e", "--elitism", type=bool, default=True, help="elitism [default=False]")
+parser.add_argument("-e", "--elitism", action='store_true', default=False, help="elitism [default=False]")
 
 # monte carlo parameters
 parser.add_argument("-sim", "--number-of-simulations", type=int, default=1, help="number of simulations for each candidate solution [default=1]")
