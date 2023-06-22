@@ -276,7 +276,8 @@ if __name__ == '__main__':
     scores = evaluate(pop, 0, n_pop*args.population_factor)
 
     # select the best candidate
-    idx = scores.index(min(scores))
+    #idx = scores.index(min(scores))
+    idx = scores.index(max(scores))
 
     # save generation, best index, and best score in an output file
     with open("output/dumpfile.dat","a") as outfile1:
@@ -289,9 +290,9 @@ if __name__ == '__main__':
         elitism = args.elitism
 
         # rank the scores for minimum problem
-        indices = list(np.argsort(scores))
+        #indices = list(np.argsort(scores))
         # rank the scores for maximum problem
-        #indices = list(np.argsort(scores)[::-1])
+        indices = list(np.argsort(scores)[::-1])
 
         # select parents from the current population
         # n_best candidates are selected to generate new candidates
@@ -325,7 +326,8 @@ if __name__ == '__main__':
             outfile2.write("{} | {}\n".format(pop,scores))
 
         # select the best candidate
-        idx = scores.index(min(scores))
+        #idx = scores.index(min(scores))
+        idx = scores.index(max(scores))
 
         # save generation, best index, and best score in an output file
         with open("output/dumpfile.dat","a") as outfile1:
